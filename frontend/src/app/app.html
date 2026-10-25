@@ -125,14 +125,14 @@
           </button>
           <button
             class="btn btn-secondary btn-sm"
-            (click)="showResetModal.set(true)"
+            (click)="openResetModal()"
             title="Azzera tutte le spunte di questo viaggio"
           >
             🔄 Azzera spunte
           </button>
           <button
             class="btn btn-danger-outline btn-sm"
-            (click)="showDeleteModal.set(true)"
+            (click)="openDeleteModal()"
             title="Elimina questo viaggio"
           >
             🗑️ Elimina
@@ -439,11 +439,11 @@
 
   <!-- Create Trip Modal -->
   @if (showCreateModal()) {
-    <div class="modal-backdrop" (click)="showCreateModal.set(false)">
-      <div class="modal-card" (click)="$event.stopPropagation()">
+    <div class="modal-backdrop" [class.closing]="isModalClosing()" (click)="closeAllModals()">
+      <div class="modal-card" [class.closing]="isModalClosing()" (click)="$event.stopPropagation()">
         <div class="modal-header">
           <h3>✈️ Crea Nuovo Viaggio</h3>
-          <button class="modal-close" (click)="showCreateModal.set(false)">✕</button>
+          <button class="modal-close" (click)="closeAllModals()">✕</button>
         </div>
         <div class="modal-body">
           <div class="form-group">
@@ -499,7 +499,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" (click)="showCreateModal.set(false)">Annulla</button>
+          <button class="btn btn-secondary" (click)="closeAllModals()">Annulla</button>
           <button
             class="btn btn-primary"
             (click)="submitCreateTrip()"
@@ -514,11 +514,11 @@
 
   <!-- Edit Trip Modal -->
   @if (showEditModal()) {
-    <div class="modal-backdrop" (click)="showEditModal.set(false)">
-      <div class="modal-card" (click)="$event.stopPropagation()">
+    <div class="modal-backdrop" [class.closing]="isModalClosing()" (click)="closeAllModals()">
+      <div class="modal-card" [class.closing]="isModalClosing()" (click)="$event.stopPropagation()">
         <div class="modal-header">
           <h3>✏️ Modifica Viaggio</h3>
-          <button class="modal-close" (click)="showEditModal.set(false)">✕</button>
+          <button class="modal-close" (click)="closeAllModals()">✕</button>
         </div>
         <div class="modal-body">
           <div class="form-group">
@@ -571,7 +571,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" (click)="showEditModal.set(false)">Annulla</button>
+          <button class="btn btn-secondary" (click)="closeAllModals()">Annulla</button>
           <button
             class="btn btn-primary"
             (click)="submitEditTrip()"
@@ -586,11 +586,11 @@
 
   <!-- Reset Trip Modal -->
   @if (showResetModal()) {
-    <div class="modal-backdrop" (click)="showResetModal.set(false)">
-      <div class="modal-card modal-sm" (click)="$event.stopPropagation()">
+    <div class="modal-backdrop" [class.closing]="isModalClosing()" (click)="closeAllModals()">
+      <div class="modal-card modal-sm" [class.closing]="isModalClosing()" (click)="$event.stopPropagation()">
         <div class="modal-header">
           <h3>🔄 Conferma Azzeramento</h3>
-          <button class="modal-close" (click)="showResetModal.set(false)">✕</button>
+          <button class="modal-close" (click)="closeAllModals()">✕</button>
         </div>
         <div class="modal-body">
           <p>
@@ -602,7 +602,7 @@
           </p>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" (click)="showResetModal.set(false)">Annulla</button>
+          <button class="btn btn-secondary" (click)="closeAllModals()">Annulla</button>
           <button class="btn btn-danger" (click)="confirmResetTrip()">Azzera Tutto</button>
         </div>
       </div>
@@ -611,11 +611,11 @@
 
   <!-- Delete Trip Modal -->
   @if (showDeleteModal()) {
-    <div class="modal-backdrop" (click)="showDeleteModal.set(false)">
-      <div class="modal-card modal-sm" (click)="$event.stopPropagation()">
+    <div class="modal-backdrop" [class.closing]="isModalClosing()" (click)="closeAllModals()">
+      <div class="modal-card modal-sm" [class.closing]="isModalClosing()" (click)="$event.stopPropagation()">
         <div class="modal-header">
           <h3>🗑️ Elimina Viaggio</h3>
-          <button class="modal-close" (click)="showDeleteModal.set(false)">✕</button>
+          <button class="modal-close" (click)="closeAllModals()">✕</button>
         </div>
         <div class="modal-body">
           <p>
@@ -627,7 +627,7 @@
           </p>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" (click)="showDeleteModal.set(false)">Annulla</button>
+          <button class="btn btn-secondary" (click)="closeAllModals()">Annulla</button>
           <button class="btn btn-danger" (click)="confirmDeleteTrip()">Elimina Viaggio</button>
         </div>
       </div>
@@ -636,11 +636,11 @@
 
   <!-- Image Lightbox Modal -->
   @if (lightboxImage(); as img) {
-    <div class="modal-backdrop" (click)="closeLightbox()">
-      <div class="lightbox-content" (click)="$event.stopPropagation()">
+    <div class="modal-backdrop" [class.closing]="isModalClosing()" (click)="closeAllModals()">
+      <div class="lightbox-content" [class.closing]="isModalClosing()" (click)="$event.stopPropagation()">
         <div class="lightbox-header">
           <span>{{ img.title }}</span>
-          <button class="modal-close" (click)="closeLightbox()">✕</button>
+          <button class="modal-close" (click)="closeAllModals()">✕</button>
         </div>
         <div class="lightbox-body">
           <img [src]="img.url" [alt]="img.title" class="lightbox-img" />

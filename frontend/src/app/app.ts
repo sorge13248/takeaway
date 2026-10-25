@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, HostListener, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from './core/api.service';
@@ -52,6 +52,7 @@ export class App implements OnInit {
   readonly showEditModal = signal<boolean>(false);
   readonly showResetModal = signal<boolean>(false);
   readonly showDeleteModal = signal<boolean>(false);
+  readonly isModalClosing = signal<boolean>(false);
   readonly lightboxImage = signal<{ url: string; title: string } | null>(null);
 
   // Forms
@@ -394,8 +395,35 @@ export class App implements OnInit {
     this.collapsedCategories.set(allCollapsed);
   }
 
+  @HostListener('window:keydown.escape')
+  handleEscape() {
+    if (
+      this.showCreateModal() ||
+      this.showEditModal() ||
+      this.showResetModal() ||
+      this.showDeleteModal() ||
+      this.lightboxImage()
+    ) {
+      this.closeAllModals();
+    }
+  }
+
+  closeAllModals() {
+    if (this.isModalClosing()) return;
+    this.isModalClosing.set(true);
+    setTimeout(() => {
+      this.showCreateModal.set(false);
+      this.showEditModal.set(false);
+      this.showResetModal.set(false);
+      this.showDeleteModal.set(false);
+      this.lightboxImage.set(null);
+      this.isModalClosing.set(false);
+    }, 210);
+  }
+
   // Modals & Trip CRUD
   openCreateModal() {
+    this.isModalClosing.set(false);
     this.tripForm = {
       title: '',
       destination: '',
@@ -419,7 +447,7 @@ export class App implements OnInit {
       })
       .subscribe({
         next: (newTrip) => {
-          this.showCreateModal.set(false);
+          this.closeAllModals();
           this.trips.update((list) => [newTrip, ...list]);
           this.selectTrip(newTrip.id);
         },
@@ -432,6 +460,7 @@ export class App implements OnInit {
   openEditModal() {
     const trip = this.activeTrip();
     if (!trip) return;
+    this.isModalClosing.set(false);
     this.tripForm = {
       title: trip.title,
       destination: trip.destination || '',
@@ -456,7 +485,7 @@ export class App implements OnInit {
       })
       .subscribe({
         next: (updated) => {
-          this.showEditModal.set(false);
+          this.closeAllModals();
           this.trips.update((list) => list.map((t) => (t.id === updated.id ? updated : t)));
           this.selectTrip(updated.id);
         },
@@ -466,13 +495,18 @@ export class App implements OnInit {
       });
   }
 
+  openResetModal() {
+    this.isModalClosing.set(false);
+    this.showResetModal.set(true);
+  }
+
   confirmResetTrip() {
     const tripId = this.activeTripId();
     if (!tripId) return;
 
     this.api.resetTrip(tripId).subscribe({
       next: () => {
-        this.showResetModal.set(false);
+        this.closeAllModals();
         this.itemStates.set({});
       },
       error: (err) => {
@@ -481,13 +515,18 @@ export class App implements OnInit {
     });
   }
 
+  openDeleteModal() {
+    this.isModalClosing.set(false);
+    this.showDeleteModal.set(true);
+  }
+
   confirmDeleteTrip() {
     const tripId = this.activeTripId();
     if (!tripId) return;
 
     this.api.deleteTrip(tripId).subscribe({
       next: () => {
-        this.showDeleteModal.set(false);
+        this.closeAllModals();
         this.trips.update((list) => list.filter((t) => t.id !== tripId));
         const remaining = this.trips();
         if (remaining.length > 0) {
@@ -505,11 +544,12 @@ export class App implements OnInit {
   }
 
   openLightbox(url: string, title: string) {
+    this.isModalClosing.set(false);
     this.lightboxImage.set({ url, title });
   }
 
   closeLightbox() {
-    this.lightboxImage.set(null);
+    this.closeAllModals();
   }
 
   // Tag helper
