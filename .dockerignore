@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.github
+.env
+*.sqlite
+*.sqlite-journal
+.angular
+deploy/data
+deploy/logs
+*.log
+Checklist viaggi-vacanze-trasferte.odt
+scratch_odt_extracted.json
+extracted_assets

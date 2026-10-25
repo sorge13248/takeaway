@@ -1,0 +1,13 @@
+{
+  "name": "take-away-list",
+  "private": true,
+  "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
+  "scripts": {
+    "start:frontend": "npm --prefix frontend run start",
+    "start:backend": "npm --prefix backend run start:dev",
+    "build": "npm --prefix frontend run build && npm --prefix backend run build",
+    "test": "npm --prefix frontend run test && npm --prefix backend run test",
+    "lint": "npm --prefix backend run lint"
+  }
+}
