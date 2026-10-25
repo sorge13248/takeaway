@@ -18,12 +18,14 @@ describe('PublicController', () => {
 
   describe('oidcConfig', () => {
     it('should return configured values', () => {
+      process.env.AUTH_MOCK_ENABLED = 'false';
       process.env.OIDC_ISSUER_URL = 'https://auth.example.com';
       process.env.OIDC_CLIENT_ID = 'test-client-id';
       process.env.OIDC_REDIRECT_URI = 'http://localhost:4200/api/auth/callback';
 
       const config = controller.oidcConfig();
       expect(config).toEqual({
+        oidcEnabled: true,
         issuerUrl: 'https://auth.example.com',
         clientId: 'test-client-id',
         redirectUri: 'http://localhost:4200/api/auth/callback',
@@ -37,6 +39,7 @@ describe('PublicController', () => {
 
       const config = controller.oidcConfig();
       expect(config).toEqual({
+        oidcEnabled: false,
         issuerUrl: '',
         clientId: '',
         redirectUri: '',

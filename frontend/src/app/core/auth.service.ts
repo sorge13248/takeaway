@@ -43,7 +43,10 @@ export class AuthService {
   sessionPingIntervalMs = 30_000;
 
   readonly isAuthenticated = computed(() => Boolean(this.currentUser()));
-  readonly oidcEnabled = computed(() => Boolean(this.oidcConfig()?.issuerUrl));
+  readonly oidcEnabled = computed(() => {
+    const config = this.oidcConfig();
+    return Boolean(config?.oidcEnabled ?? Boolean(config?.issuerUrl));
+  });
   readonly displayName = computed(() => this.currentUser()?.displayName ?? 'Ospite');
   readonly email = computed(() => this.currentUser()?.email ?? null);
   readonly pictureUrl = computed(() => this.currentUser()?.pictureUrl ?? null);
@@ -122,7 +125,7 @@ export class AuthService {
   async loadOidcConfig(): Promise<void> {
     this.clearMetadataRetry();
     const config = await firstValueFrom(this.api.getOidcConfig().pipe(catchError(() => of(null))));
-    if (!config || !config.issuerUrl) {
+    if (!config || (!config.issuerUrl && !config.oidcEnabled)) {
       this.oidcConfig.set(null);
       this.oidcMetadata.set(null);
       this.error.set(null);
@@ -134,21 +137,30 @@ export class AuthService {
 
     if (!config.issuerUrl || !config.clientId || !config.redirectUri) {
       this.oidcMetadata.set(null);
-      this.error.set('Configurazione OIDC incompleta');
-      this.scheduleMetadataRetryIfNeeded();
+      if (config.oidcEnabled) {
+        this.error.set('Configurazione OIDC incompleta');
+      }
       return;
     }
 
-    const metadata = await firstValueFrom(this.api.getOidcMetadata().pipe(catchError(() => of(null))));
-    this.oidcMetadata.set(metadata);
+    void this.loadMetadataAsync();
+  }
 
-    if (!metadata) {
-      this.error.set('Metadata OIDC non disponibili');
+  private async loadMetadataAsync(): Promise<void> {
+    try {
+      const metadata = await firstValueFrom(this.api.getOidcMetadata().pipe(catchError(() => of(null))));
+      this.oidcMetadata.set(metadata);
+
+      if (!metadata) {
+        this.error.set('Metadata OIDC non disponibili');
+        this.scheduleMetadataRetryIfNeeded();
+      } else {
+        this.error.set(null);
+      }
+    } catch {
+      this.oidcMetadata.set(null);
       this.scheduleMetadataRetryIfNeeded();
-      return;
     }
-
-    this.error.set(null);
   }
 
   login(returnUrl?: string): void {
@@ -294,8 +306,10 @@ export class AuthService {
       // Keep anonymous profile when backend session is missing.
     }
 
-    this.currentUser.set(null);
-    return null;
+    if (!this.currentUser()) {
+      this.currentUser.set(null);
+    }
+    return this.currentUser();
   }
 
   private scheduleMetadataRetryIfNeeded(): void {

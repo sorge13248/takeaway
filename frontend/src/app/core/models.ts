@@ -10,6 +10,7 @@ export interface OidcConfig {
   issuerUrl: string;
   clientId: string;
   redirectUri: string;
+  oidcEnabled?: boolean;
 }
 
 export interface OidcMetadata {
@@ -30,6 +31,10 @@ export interface CatalogItem {
   toBuy: boolean;
   imageUrl: string | null;
   sortOrder: number;
+  categories?: { id: string; slug: string; name: string; icon: string }[];
+  categoryIds?: string[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CatalogCategory {
@@ -40,6 +45,46 @@ export interface CatalogCategory {
   icon: string;
   sortOrder: number;
   items: CatalogItem[];
+}
+
+export interface CategoryWithCount {
+  id: string;
+  slug: string;
+  name: string;
+  parentGroup: string | null;
+  icon: string;
+  sortOrder: number;
+  itemsCount: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateCategoryDto {
+  name: string;
+  slug?: string;
+  parentGroup?: string | null;
+  icon?: string;
+  sortOrder?: number;
+}
+
+export interface CreateItemDto {
+  name: string;
+  description?: string | null;
+  tags?: string[];
+  defaultQuantity?: number;
+  isPreparation?: boolean;
+  minDays?: number | null;
+  toBuy?: boolean;
+  imageUrl?: string | null;
+  sortOrder?: number;
+  categoryIds?: string[];
+}
+
+export interface CatalogExportData {
+  version: number;
+  exportedAt: string;
+  categories: any[];
+  items: any[];
 }
 
 export interface TripSummary {

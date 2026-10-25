@@ -1,4 +1,8 @@
-import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, Res, ServiceUnavailableException } from '@nestjs/common';
+import type { Response } from 'express';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import { getUploadsDir } from './controllers/catalog.controller.js';
 
 export interface OidcMetadata {
   authorization_endpoint: string;
@@ -11,10 +15,12 @@ export interface OidcMetadata {
 export class PublicController {
   @Get('oidc/config')
   oidcConfig() {
+    const mockEnabled = process.env.AUTH_MOCK_ENABLED === 'true' || !process.env.OIDC_ISSUER_URL;
     return {
-      issuerUrl: process.env.OIDC_ISSUER_URL ?? '',
-      clientId: process.env.OIDC_CLIENT_ID ?? '',
-      redirectUri: process.env.OIDC_REDIRECT_URI ?? '',
+      oidcEnabled: !mockEnabled,
+      issuerUrl: !mockEnabled ? (process.env.OIDC_ISSUER_URL ?? '').trim() : '',
+      clientId: !mockEnabled ? (process.env.OIDC_CLIENT_ID ?? '').trim() : '',
+      redirectUri: !mockEnabled ? (process.env.OIDC_REDIRECT_URI ?? '').trim() : '',
     };
   }
 
@@ -33,5 +39,14 @@ export class PublicController {
 
     return (await response.json()) as OidcMetadata;
   }
-}
 
+  @Get('uploads/:filename')
+  serveUpload(@Param('filename') filename: string, @Res() res: Response) {
+    const safeFilename = path.basename(filename);
+    const filePath = path.join(getUploadsDir(), safeFilename);
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException('Immagine non trovata');
+    }
+    return res.sendFile(filePath);
+  }
+}

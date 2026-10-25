@@ -1,0 +1,849 @@
+<div class="domain-manager-page">
+  <!-- Top Navigation Bar / Breadcrumb -->
+  <div class="nav-bar">
+    <div class="page-title-box">
+      <h2>🗂️ Gestione Domini & Catalogo</h2>
+      <p class="subtitle">Configura le sezioni (categorie), gli oggetti da portare in viaggio, le immagini e importa/esporta il catalogo.</p>
+    </div>
+  </div>
+
+  <!-- Toast Notification Feedback -->
+  @if (successMessage(); as msg) {
+    <div class="toast toast-success" role="status">
+      <span class="toast-icon">✅</span>
+      <span class="toast-text">{{ msg }}</span>
+      <button class="toast-close" (click)="successMessage.set(null)">✕</button>
+    </div>
+  }
+
+  <!-- Error Banner -->
+  @if (errorMessage(); as err) {
+    <div class="toast toast-danger" role="alert">
+      <span class="toast-icon">⚠️</span>
+      <span class="toast-text">{{ err }}</span>
+      <button class="toast-close" (click)="errorMessage.set(null)">✕</button>
+    </div>
+  }
+
+  <!-- Tab Navigation Switcher -->
+  <div class="tab-switcher">
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'categories'"
+      (click)="activeTab.set('categories')"
+    >
+      <span class="tab-icon">📁</span>
+      <span class="tab-label">Sezioni / Categorie</span>
+      <span class="tab-badge">{{ categories().length }}</span>
+    </button>
+
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'items'"
+      (click)="activeTab.set('items')"
+    >
+      <span class="tab-icon">🎒</span>
+      <span class="tab-label">Oggetti / Item</span>
+      <span class="tab-badge">{{ items().length }}</span>
+    </button>
+
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'backup'"
+      (click)="activeTab.set('backup')"
+    >
+      <span class="tab-icon">🔄</span>
+      <span class="tab-label">Backup & Ripristino</span>
+    </button>
+  </div>
+
+  <!-- Loading State Indicator -->
+  @if (loading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Caricamento dati catalogo...</p>
+    </div>
+  } @else {
+    <!-- ==================================================================== -->
+    <!-- TAB 1: CATEGORIE / SEZIONI                                            -->
+    <!-- ==================================================================== -->
+    @if (activeTab() === 'categories') {
+      <section class="tab-content categories-tab">
+        <!-- Action & Filter Bar -->
+        <div class="tab-action-bar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input
+              type="text"
+              class="search-input"
+              placeholder="Cerca sezione per nome o gruppo..."
+              [value]="categorySearch()"
+              (input)="categorySearch.set($any($event.target).value)"
+            />
+            @if (categorySearch()) {
+              <button class="btn-clear" (click)="categorySearch.set('')">✕</button>
+            }
+          </div>
+
+          <button class="btn btn-primary" (click)="openCreateCategoryModal()">
+            <span class="btn-icon-plus">+</span> Nuova Sezione
+          </button>
+        </div>
+
+        <!-- Categories List Grid -->
+        <div class="categories-grid">
+          @for (cat of filteredCategories(); track cat.id) {
+            <div class="category-card-item">
+              <div class="card-left">
+                <div class="category-emoji-box" [title]="cat.icon">
+                  {{ getCategoryEmoji(cat.icon) }}
+                </div>
+                <div class="category-details">
+                  <div class="category-title-row">
+                    <h3 class="category-name">{{ cat.name }}</h3>
+                    @if (cat.parentGroup) {
+                      <span class="parent-group-badge" title="Gruppo di appartenenza">
+                        📁 {{ cat.parentGroup }}
+                      </span>
+                    }
+                  </div>
+                  <div class="category-meta">
+                    <code class="slug-tag">#{{ cat.slug }}</code>
+                    <span class="meta-dot">&bull;</span>
+                    <span class="items-count-tag">
+                      <strong>{{ cat.itemsCount }}</strong> oggetti associati
+                    </span>
+                    <span class="meta-dot">&bull;</span>
+                    <span class="sort-tag" title="Ordine di visualizzazione">
+                      Posizione #{{ cat.sortOrder }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card-actions">
+                <button
+                  class="btn-action edit"
+                  (click)="openEditCategoryModal(cat)"
+                  title="Modifica sezione"
+                >
+                  ✏️ Modifica
+                </button>
+                <button
+                  class="btn-action delete"
+                  (click)="confirmDeleteCategory(cat)"
+                  title="Elimina sezione"
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
+          } @empty {
+            <div class="empty-state-card">
+              <div class="empty-icon">📁</div>
+              <h3>Nessuna sezione trovata</h3>
+              @if (categorySearch()) {
+                <p>Nessun risultato corrisponde alla ricerca "{{ categorySearch() }}".</p>
+                <button class="btn btn-secondary btn-sm" (click)="categorySearch.set('')">
+                  Azzera filtro
+                </button>
+              } @else {
+                <p>Il catalogo non contiene ancora sezioni. Crea la tua prima sezione per iniziare a organizzare gli oggetti da viaggio.</p>
+                <button class="btn btn-primary" (click)="openCreateCategoryModal()">
+                  + Crea la prima sezione
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- ==================================================================== -->
+    <!-- TAB 2: OGGETTI / ITEM                                                 -->
+    <!-- ==================================================================== -->
+    @if (activeTab() === 'items') {
+      <section class="tab-content items-tab">
+        <!-- Filter & Search Controls Bar -->
+        <div class="items-filter-bar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input
+              type="text"
+              class="search-input"
+              placeholder="Cerca per nome o descrizione oggetto..."
+              [value]="itemSearch()"
+              (input)="itemSearch.set($any($event.target).value)"
+            />
+            @if (itemSearch()) {
+              <button class="btn-clear" (click)="itemSearch.set('')">✕</button>
+            }
+          </div>
+
+          <!-- Category Filter Select -->
+          <div class="select-filter-group">
+            <label for="cat-filter" class="filter-label">Sezione:</label>
+            <select
+              id="cat-filter"
+              class="form-select"
+              [value]="itemCategoryFilter()"
+              (change)="itemCategoryFilter.set($any($event.target).value)"
+            >
+              <option value="all">Tutte le sezioni ({{ items().length }})</option>
+              @for (cat of categories(); track cat.id) {
+                <option [value]="cat.id">
+                  {{ getCategoryEmoji(cat.icon) }} {{ cat.name }} ({{ cat.itemsCount }})
+                </option>
+              }
+            </select>
+          </div>
+
+          <!-- Tag Filter Select -->
+          <div class="select-filter-group">
+            <label for="tag-filter" class="filter-label">Filtro tag:</label>
+            <select
+              id="tag-filter"
+              class="form-select"
+              [value]="itemTagFilter()"
+              (change)="itemTagFilter.set($any($event.target).value)"
+            >
+              <option value="all">Tutti i tag</option>
+              @for (tag of tagOptions; track tag.key) {
+                <option [value]="tag.key">{{ tag.emoji }} {{ tag.label }}</option>
+              }
+            </select>
+          </div>
+
+          <button class="btn btn-primary" (click)="openCreateItemModal()">
+            <span class="btn-icon-plus">+</span> Nuovo Oggetto
+          </button>
+        </div>
+
+        <!-- Items Table / List -->
+        <div class="items-list-container">
+          @for (item of filteredItems(); track item.id) {
+            <div class="item-domain-card">
+              <!-- Left: Image Preview or Placeholder -->
+              <div class="item-img-preview-box">
+                @if (item.imageUrl) {
+                  <img
+                    [src]="item.imageUrl"
+                    [alt]="item.name"
+                    class="item-thumb-img"
+                    (click)="openLightbox(item.imageUrl, item.name)"
+                    title="Clicca per ingrandire"
+                  />
+                } @else {
+                  <div class="item-thumb-placeholder" title="Nessuna foto">
+                    📦
+                  </div>
+                }
+              </div>
+
+              <!-- Center: Details, Tags, Categories -->
+              <div class="item-main-details">
+                <div class="item-name-row">
+                  <h4 class="item-title">{{ item.name }}</h4>
+
+                  <!-- Tags -->
+                  @for (tag of item.tags; track tag) {
+                    @let tagInfo = getTagInfo(tag);
+                    <span class="tag-badge" [class]="tagInfo.class" [title]="tagInfo.label">
+                      {{ tagInfo.emoji }} {{ tagInfo.label }}
+                    </span>
+                  }
+
+                  <!-- Special Flags -->
+                  @if (item.toBuy) {
+                    <span class="flag-badge badge-warning" title="Da acquistare prima della partenza">
+                      🛒 Da acquistare
+                    </span>
+                  }
+                  @if (item.isPreparation) {
+                    <span class="flag-badge badge-info" title="Azione di preparazione personale pre-partenza">
+                      ✨ Preparazione
+                    </span>
+                  }
+                  @if (item.minDays) {
+                    <span class="flag-badge badge-purple" title="Consigliato per viaggi di oltre {{ item.minDays }} giorni">
+                      ⏱️ > {{ item.minDays }} gg
+                    </span>
+                  }
+                </div>
+
+                @if (item.description) {
+                  <p class="item-desc">💡 {{ item.description }}</p>
+                }
+
+                <!-- Associated Categories -->
+                <div class="item-categories-list">
+                  <span class="meta-label">Sezioni:</span>
+                  @if (item.categories && item.categories.length > 0) {
+                    @for (c of item.categories; track c.id) {
+                      <span class="category-pill">
+                        {{ getCategoryEmoji(c.icon) }} {{ c.name }}
+                      </span>
+                    }
+                  } @else {
+                    <span class="unassigned-text">Nessuna sezione assegnata</span>
+                  }
+
+                  <span class="meta-dot">&bull;</span>
+                  <span class="qty-pill" title="Quantità predefinita">
+                    Qtà standard: <strong>{{ item.defaultQuantity || 1 }}</strong>
+                  </span>
+                  <span class="meta-dot">&bull;</span>
+                  <span class="sort-tag">Pos: #{{ item.sortOrder }}</span>
+                </div>
+              </div>
+
+              <!-- Right: Actions -->
+              <div class="item-actions">
+                <button
+                  class="btn-action edit"
+                  (click)="openEditItemModal(item)"
+                  title="Modifica oggetto"
+                >
+                  ✏️ Modifica
+                </button>
+                <button
+                  class="btn-action delete"
+                  (click)="confirmDeleteItem(item)"
+                  title="Elimina oggetto"
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
+          } @empty {
+            <div class="empty-state-card">
+              <div class="empty-icon">🎒</div>
+              <h3>Nessun oggetto trovato</h3>
+              @if (itemSearch() || itemCategoryFilter() !== 'all' || itemTagFilter() !== 'all') {
+                <p>Nessun oggetto corrisponde ai filtri selezionati.</p>
+                <button
+                  class="btn btn-secondary btn-sm"
+                  (click)="itemSearch.set(''); itemCategoryFilter.set('all'); itemTagFilter.set('all')"
+                >
+                  Azzera filtri
+                </button>
+              } @else {
+                <p>Non hai ancora registrato nessun oggetto nel catalogo. Aggiungi il tuo primo oggetto specificando quantità, sezioni e immagine!</p>
+                <button class="btn btn-primary" (click)="openCreateItemModal()">
+                  + Crea il primo oggetto
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- ==================================================================== -->
+    <!-- TAB 3: BACKUP & RIPRISTINO                                            -->
+    <!-- ==================================================================== -->
+    @if (activeTab() === 'backup') {
+      <section class="tab-content backup-tab">
+        <div class="backup-grid">
+          <!-- Card 1: Esporta Catalogo -->
+          <div class="backup-card">
+            <div class="backup-card-header">
+              <div class="backup-icon">📤</div>
+              <div>
+                <h3>Esporta Catalogo</h3>
+                <p>Scarica un file JSON completo contenente tutte le sezioni, gli oggetti, i tag e le relazioni.</p>
+              </div>
+            </div>
+
+            <div class="backup-card-body">
+              <div class="summary-stats">
+                <div class="stat-pill">
+                  <strong>{{ categories().length }}</strong> Sezioni
+                </div>
+                <div class="stat-pill">
+                  <strong>{{ items().length }}</strong> Oggetti
+                </div>
+              </div>
+              <p class="help-text">
+                Il file esportato include tutti i metadati e può essere utilizzato per creare copie di backup o trasferire il catalogo su un'altra installazione.
+              </p>
+            </div>
+
+            <div class="backup-card-footer">
+              <button class="btn btn-primary btn-block" (click)="exportJson()">
+                💾 Scarica File JSON
+              </button>
+            </div>
+          </div>
+
+          <!-- Card 2: Importa Catalogo -->
+          <div class="backup-card">
+            <div class="backup-card-header">
+              <div class="backup-icon">📥</div>
+              <div>
+                <h3>Importa Catalogo</h3>
+                <p>Carica un file JSON di catalogo per importare o aggiornare le sezioni e gli oggetti.</p>
+              </div>
+            </div>
+
+            <div class="backup-card-body">
+              <!-- File Picker Input -->
+              <div class="file-drop-area">
+                <input
+                  type="file"
+                  id="import-file"
+                  accept=".json,application/json"
+                  class="hidden-file-input"
+                  (change)="onImportFileSelected($event)"
+                />
+                <label for="import-file" class="drop-zone-label">
+                  <span class="drop-icon">📁</span>
+                  @if (importFile) {
+                    <span class="file-name-chosen">📄 {{ importFile.name }} ({{ (importFile.size / 1024).toFixed(1) }} KB)</span>
+                  } @else {
+                    <span class="drop-text">Trascina un file JSON qui o <strong>clicca per sfogliare</strong></span>
+                  }
+                </label>
+              </div>
+
+              <!-- Preview stats if valid JSON chosen -->
+              @if (importPreview) {
+                <div class="preview-box">
+                  <span class="preview-badge">✅ File valido:</span>
+                  <span>{{ importPreview.categoriesCount }} sezioni e {{ importPreview.itemsCount }} oggetti rilevati.</span>
+                </div>
+              }
+
+              <!-- Mode Selection -->
+              <div class="import-mode-group">
+                <label class="mode-label">Modalità di importazione:</label>
+                <div class="radio-options">
+                  <label class="radio-card" [class.selected]="importMode === 'merge'">
+                    <input
+                      type="radio"
+                      name="importMode"
+                      value="merge"
+                      [(ngModel)]="importMode"
+                    />
+                    <div>
+                      <strong>Unisci (Merge)</strong>
+                      <p>Aggiunge nuove sezioni e oggetti aggiornando quelli esistenti senza cancellare nulla.</p>
+                    </div>
+                  </label>
+
+                  <label class="radio-card danger" [class.selected]="importMode === 'replace'">
+                    <input
+                      type="radio"
+                      name="importMode"
+                      value="replace"
+                      [(ngModel)]="importMode"
+                    />
+                    <div>
+                      <strong>Sostituisci tutto (Replace)</strong>
+                      <p>Svuota il catalogo attuale e importa integralmente i dati dal file JSON.</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Error notice -->
+              @if (importError()) {
+                <div class="import-error-banner">
+                  ⚠️ {{ importError() }}
+                </div>
+              }
+            </div>
+
+            <div class="backup-card-footer">
+              <button
+                class="btn btn-primary btn-block"
+                [disabled]="!importFile || importing()"
+                (click)="runImport()"
+              >
+                @if (importing()) {
+                  <span class="spinner-sm"></span> Importazione in corso...
+                } @else {
+                  🚀 Avvia Importazione
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    }
+  }
+
+  <!-- ==================================================================== -->
+  <!-- MODAL: CREA / MODIFICA SEZIONE (WINDOWS 7 STYLE)                      -->
+  <!-- ==================================================================== -->
+  @if (showCategoryModal()) {
+    <div
+      class="modal-backdrop"
+      [class.closing]="isModalClosing()"
+      (click)="closeModals()"
+    >
+      <div
+        class="modal-card category-dialog"
+        [class.closing]="isModalClosing()"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="modal-header">
+          <div class="modal-header-title">
+            <span class="modal-icon">{{ getCategoryEmoji(categoryForm.icon) }}</span>
+            <h3>{{ isEditingCategory() ? 'Modifica Sezione' : 'Nuova Sezione' }}</h3>
+          </div>
+          <button class="modal-close" (click)="closeModals()">✕</button>
+        </div>
+
+        <form (ngSubmit)="saveCategory()">
+          <div class="modal-body">
+            <!-- Name -->
+            <div class="form-group">
+              <label for="cat-name">Nome Sezione *</label>
+              <input
+                id="cat-name"
+                type="text"
+                class="form-control"
+                placeholder="Es. Documenti di viaggio, Abbigliamento..."
+                [(ngModel)]="categoryForm.name"
+                (ngModelChange)="onCategoryNameChange($event)"
+                name="name"
+                required
+                autofocus
+              />
+            </div>
+
+            <!-- Slug -->
+            <div class="form-group">
+              <label for="cat-slug">Identificativo URL (Slug)</label>
+              <input
+                id="cat-slug"
+                type="text"
+                class="form-control"
+                placeholder="es. documenti-viaggio"
+                [(ngModel)]="categoryForm.slug"
+                (input)="slugManuallyEdited = true"
+                name="slug"
+              />
+              <span class="field-hint">Generato automaticamente, puoi personalizzarlo.</span>
+            </div>
+
+            <!-- Parent Group -->
+            <div class="form-group">
+              <label for="cat-parent">Gruppo padre (Opzionale)</label>
+              <input
+                id="cat-parent"
+                type="text"
+                list="parent-group-datalist"
+                class="form-control"
+                placeholder="Es. Abbigliamento (per raggruppare Busto, Gambe, Intimo...)"
+                [(ngModel)]="categoryForm.parentGroup"
+                name="parentGroup"
+              />
+              <datalist id="parent-group-datalist">
+                @for (g of parentGroups(); track g) {
+                  <option [value]="g"></option>
+                }
+              </datalist>
+            </div>
+
+            <!-- Icon Picker -->
+            <div class="form-group">
+              <label>Icona</label>
+              <div class="icon-picker-grid">
+                @for (preset of iconPresets; track preset.key) {
+                  <button
+                    type="button"
+                    class="icon-picker-chip"
+                    [class.selected]="categoryForm.icon === preset.key"
+                    (click)="categoryForm.icon = preset.key"
+                    [title]="preset.label"
+                  >
+                    <span class="picker-emoji">{{ preset.emoji }}</span>
+                    <span class="picker-label">{{ preset.label }}</span>
+                  </button>
+                }
+              </div>
+            </div>
+
+            <!-- Sort Order -->
+            <div class="form-group">
+              <label for="cat-order">Posizione ordinamento</label>
+              <input
+                id="cat-order"
+                type="number"
+                class="form-control"
+                [(ngModel)]="categoryForm.sortOrder"
+                name="sortOrder"
+                min="0"
+              />
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeModals()">
+              Annulla
+            </button>
+            <button
+              type="submit"
+              class="btn btn-primary"
+              [disabled]="saving() || !categoryForm.name.trim()"
+            >
+              @if (saving()) {
+                <span class="spinner-sm"></span> Salvataggio...
+              } @else {
+                {{ isEditingCategory() ? 'Salva Modifiche' : 'Crea Sezione' }}
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- ==================================================================== -->
+  <!-- MODAL: CREA / MODIFICA OGGETTO CON UPLOAD IMMAGINE                     -->
+  <!-- ==================================================================== -->
+  @if (showItemModal()) {
+    <div
+      class="modal-backdrop"
+      [class.closing]="isModalClosing()"
+      (click)="closeModals()"
+    >
+      <div
+        class="modal-card item-dialog"
+        [class.closing]="isModalClosing()"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="modal-header">
+          <div class="modal-header-title">
+            <span class="modal-icon">🎒</span>
+            <h3>{{ isEditingItem() ? 'Modifica Oggetto' : 'Nuovo Oggetto' }}</h3>
+          </div>
+          <button class="modal-close" (click)="closeModals()">✕</button>
+        </div>
+
+        <form (ngSubmit)="saveItem()">
+          <div class="modal-body">
+            <!-- Row: Name & Default Quantity -->
+            <div class="form-row">
+              <div class="form-group flex-3">
+                <label for="item-name">Nome Oggetto *</label>
+                <input
+                  id="item-name"
+                  type="text"
+                  class="form-control"
+                  placeholder="Es. Spazzolino elettrico, Jeans leggeri..."
+                  [(ngModel)]="itemForm.name"
+                  name="name"
+                  required
+                  autofocus
+                />
+              </div>
+
+              <div class="form-group flex-1">
+                <label for="item-qty">Qtà standard</label>
+                <input
+                  id="item-qty"
+                  type="number"
+                  class="form-control"
+                  [(ngModel)]="itemForm.defaultQuantity"
+                  name="defaultQuantity"
+                  min="1"
+                />
+              </div>
+            </div>
+
+            <!-- Description -->
+            <div class="form-group">
+              <label for="item-desc">Descrizione / Note consigliate</label>
+              <textarea
+                id="item-desc"
+                rows="2"
+                class="form-control textarea"
+                placeholder="Es. portare caricatore specifico, preferibilmente impermeabile..."
+                [(ngModel)]="itemForm.description"
+                name="description"
+              ></textarea>
+            </div>
+
+            <!-- IMAGE UPLOAD SECTION -->
+            <div class="form-group">
+              <label class="form-label-with-icon">
+                <span>📷 Foto / Immagine di riferimento</span>
+              </label>
+
+              <div class="image-upload-wrapper">
+                @if (itemForm.imageUrl) {
+                  <div class="uploaded-image-preview">
+                    <img [src]="itemForm.imageUrl" [alt]="itemForm.name" class="preview-img" />
+                    <div class="image-actions-overlay">
+                      <button
+                        type="button"
+                        class="btn-danger-sm"
+                        (click)="removeImage()"
+                        title="Rimuovi immagine"
+                      >
+                        🗑️ Rimuovi foto
+                      </button>
+                    </div>
+                  </div>
+                } @else {
+                  <div class="upload-drop-zone">
+                    <input
+                      type="file"
+                      id="item-file-input"
+                      accept="image/*"
+                      class="hidden-file-input"
+                      (change)="onFileSelected($event)"
+                    />
+                    <label for="item-file-input" class="upload-label-btn">
+                      @if (uploadingImage()) {
+                        <span class="spinner-sm"></span> Caricamento in corso...
+                      } @else {
+                        <span class="upload-icon">📷</span>
+                        <span>Carica foto (JPG, PNG, WEBP, SVG)</span>
+                      }
+                    </label>
+                  </div>
+                }
+
+                @if (uploadError()) {
+                  <div class="upload-error-text">⚠️ {{ uploadError() }}</div>
+                }
+              </div>
+            </div>
+
+            <!-- Category Associations (Multi-select) -->
+            <div class="form-group">
+              <label>Sezioni di appartenenza</label>
+              <div class="category-chips-selector">
+                @for (cat of categories(); track cat.id) {
+                  @let isSelected = itemForm.categoryIds.includes(cat.id);
+                  <button
+                    type="button"
+                    class="category-select-chip"
+                    [class.selected]="isSelected"
+                    (click)="toggleCategoryLink(cat.id)"
+                  >
+                    <span class="chip-check">{{ isSelected ? '✓' : '+' }}</span>
+                    <span>{{ getCategoryEmoji(cat.icon) }} {{ cat.name }}</span>
+                  </button>
+                }
+              </div>
+              <span class="field-hint">Un oggetto può appartenere a più sezioni (es. Busto e Mare).</span>
+            </div>
+
+            <!-- Tag Chips (Summer, Winter, Night, etc) -->
+            <div class="form-group">
+              <label>Tag climatici & trasporto</label>
+              <div class="tag-chips-selector">
+                @for (tag of tagOptions; track tag.key) {
+                  @let isTagActive = itemForm.tags.includes(tag.key);
+                  <button
+                    type="button"
+                    class="chip-toggle"
+                    [class]="tag.class"
+                    [class.active]="isTagActive"
+                    (click)="toggleTag(tag.key)"
+                  >
+                    <span>{{ tag.emoji }} {{ tag.label }}</span>
+                  </button>
+                }
+              </div>
+            </div>
+
+            <!-- Flags (toBuy, isPreparation, minDays) -->
+            <div class="form-group flags-fieldset">
+              <label class="checkbox-control">
+                <input
+                  type="checkbox"
+                  [(ngModel)]="itemForm.toBuy"
+                  name="toBuy"
+                />
+                <span class="checkbox-label">
+                  <strong>🛒 Da acquistare</strong> (necessario comprare prima di partire)
+                </span>
+              </label>
+
+              <label class="checkbox-control">
+                <input
+                  type="checkbox"
+                  [(ngModel)]="itemForm.isPreparation"
+                  name="isPreparation"
+                />
+                <span class="checkbox-label">
+                  <strong>✨ Azione di preparazione</strong> (es. tagliare unghie, doccia, check documenti)
+                </span>
+              </label>
+
+              <div class="min-days-row">
+                <label for="item-min-days" class="inline-label">
+                  ⏱️ Consigliato per viaggi di oltre
+                </label>
+                <input
+                  id="item-min-days"
+                  type="number"
+                  class="form-control input-sm"
+                  [(ngModel)]="itemForm.minDays"
+                  name="minDays"
+                  placeholder="es. 5"
+                  min="1"
+                />
+                <span class="inline-unit">giorni</span>
+              </div>
+            </div>
+
+            <!-- Sort order -->
+            <div class="form-group">
+              <label for="item-sort">Posizione ordinamento</label>
+              <input
+                id="item-sort"
+                type="number"
+                class="form-control"
+                [(ngModel)]="itemForm.sortOrder"
+                name="sortOrder"
+                min="0"
+              />
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeModals()">
+              Annulla
+            </button>
+            <button
+              type="submit"
+              class="btn btn-primary"
+              [disabled]="saving() || !itemForm.name.trim()"
+            >
+              @if (saving()) {
+                <span class="spinner-sm"></span> Salvataggio...
+              } @else {
+                {{ isEditingItem() ? 'Salva Oggetto' : 'Crea Oggetto' }}
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- ==================================================================== -->
+  <!-- LIGHTBOX IMAGE PREVIEW MODAL                                          -->
+  <!-- ==================================================================== -->
+  @if (lightboxImage(); as lb) {
+    <div class="lightbox-backdrop" (click)="closeLightbox()">
+      <div class="lightbox-dialog" (click)="$event.stopPropagation()">
+        <div class="lightbox-header">
+          <h4>{{ lb.title }}</h4>
+          <button class="lightbox-close" (click)="closeLightbox()">✕</button>
+        </div>
+        <div class="lightbox-body">
+          <img [src]="lb.url" [alt]="lb.title" class="lightbox-image" />
+        </div>
+      </div>
+    </div>
+  }
+</div>
+

@@ -31,6 +31,36 @@
   gap: 16px;
 }
 
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+
+  .nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: all 0.15s ease;
+
+    &:hover {
+      color: var(--text-main);
+      background-color: var(--surface-hover);
+    }
+
+    &.active {
+      color: var(--primary);
+      background-color: var(--primary-light);
+    }
+  }
+}
+
 .brand {
   display: flex;
   align-items: center;

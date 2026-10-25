@@ -8,7 +8,7 @@ export const authGuard: CanActivateFn = async (route, state) => {
 
   await auth.ensureInitialized();
 
-  if (auth.oidcEnabled() && !auth.currentUser()) {
+  if (!auth.currentUser()) {
     const returnUrl = state.url && state.url !== '/' ? state.url : undefined;
     return router.createUrlTree(['/login'], {
       queryParams: returnUrl ? { returnUrl } : undefined,
@@ -24,10 +24,9 @@ export const loginGuard: CanActivateFn = async () => {
 
   await auth.ensureInitialized();
 
-  if (!auth.oidcEnabled() || auth.currentUser()) {
+  if (auth.currentUser()) {
     return router.createUrlTree(['/']);
   }
 
   return true;
 };
-

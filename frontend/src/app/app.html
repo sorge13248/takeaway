@@ -10,6 +10,26 @@
             <span class="brand-subtitle">Packing Checklist</span>
           </div>
         </a>
+
+        @if (auth.currentUser()) {
+          <nav class="header-nav">
+            <a
+              routerLink="/"
+              class="nav-link"
+              routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: true }"
+            >
+              🎒 Viaggi
+            </a>
+            <a
+              routerLink="/domains"
+              class="nav-link"
+              routerLinkActive="active"
+            >
+              🗂️ Gestione Domini
+            </a>
+          </nav>
+        }
       </div>
 
       <div class="header-right">
@@ -57,8 +77,9 @@
         <div class="spinner"></div>
         <p>Verifica autenticazione...</p>
       </div>
+    } @else {
+      <router-outlet></router-outlet>
     }
-    <router-outlet></router-outlet>
   </main>
 
   <!-- Application Footer (hidden on login page) -->

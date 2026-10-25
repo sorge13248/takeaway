@@ -3,6 +3,7 @@ declare namespace NodeJS {
     NODE_ENV?: 'development' | 'production' | 'test';
     PORT?: string;
     DB_PATH?: string;
+    UPLOADS_DIR?: string;
     DB_AUTO_LOAD_ENTITIES?: string;
     DB_SYNCHRONIZE?: string;
     DB_LOGGING?: string;
@@ -16,3 +17,8 @@ declare namespace NodeJS {
   }
 }
 
+declare module 'multer' {
+  const multer: any;
+  export const diskStorage: any;
+  export default multer;
+}
