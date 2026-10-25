@@ -1,0 +1,248 @@
+<div class="trip-list-page">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="header-intro">
+      <div class="title-row">
+        <h2>I Miei Viaggi</h2>
+        @if (!loadingTrips()) {
+          <span class="badge badge-neutral" title="Totale viaggi registrati">
+            {{ sortedTrips().length }} {{ sortedTrips().length === 1 ? 'viaggio' : 'viaggi' }}
+          </span>
+        }
+      </div>
+      <p class="subtitle">Seleziona un viaggio per preparare la valigia o creane uno nuovo.</p>
+    </div>
+
+    @if (!loadingTrips() && trips().length > 3) {
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Cerca viaggio o destinazione..."
+          [ngModel]="searchQuery()"
+          (ngModelChange)="searchQuery.set($event); currentPage.set(1)"
+        />
+        @if (searchQuery()) {
+          <button class="clear-search" (click)="searchQuery.set(''); currentPage.set(1)" title="Pulisci ricerca">✕</button>
+        }
+      </div>
+    }
+  </div>
+
+  @if (loadingTrips()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Caricamento viaggi in corso...</p>
+    </div>
+  } @else {
+    <!-- Trips Grid -->
+    <div class="trips-grid">
+      <!-- Always First Card: Dashed Create Trip Placeholder -->
+      <div
+        class="trip-card create-card"
+        role="button"
+        tabindex="0"
+        (click)="openCreateModal()"
+        (keydown.enter)="openCreateModal()"
+        (keydown.space)="openCreateModal(); $event.preventDefault()"
+        title="Crea un nuovo viaggio"
+      >
+        <div class="create-card-inner">
+          <div class="create-icon-wrapper">
+            <span class="plus-icon">+</span>
+          </div>
+          <h3 class="create-title">Nuovo Viaggio</h3>
+          <p class="create-desc">Pianifica una nuova partenza e organizza la valigia</p>
+        </div>
+      </div>
+
+      <!-- Paginated Trip Cards -->
+      @for (trip of paginatedTrips(); track trip.id) {
+        <a
+          [routerLink]="['/trips', trip.id]"
+          class="trip-card item-card"
+          title="Apri viaggio {{ trip.title }}"
+        >
+          <div class="trip-card-header">
+            <div class="trip-title-dest">
+              <h3 class="trip-title">{{ trip.title }}</h3>
+              @if (trip.destination) {
+                <span class="destination-pill">📍 {{ trip.destination }}</span>
+              }
+            </div>
+          </div>
+
+          <div class="trip-card-body">
+            @if (formatTripDates(trip); as dates) {
+              <div class="trip-card-date">
+                📅 {{ dates }}
+              </div>
+            }
+            @if (trip.notes) {
+              <p class="trip-card-notes">📝 {{ trip.notes }}</p>
+            }
+          </div>
+
+          <div class="trip-card-footer">
+            <!-- Progress Bar -->
+            <div class="trip-progress">
+              <div class="progress-labels">
+                <span class="progress-text">
+                  @if (trip.valorizedCount > 0) {
+                    {{ trip.packedCount }} di {{ trip.valorizedCount }} pronti
+                  } @else {
+                    Nessun oggetto in lista
+                  }
+                </span>
+                <span class="progress-percent">
+                  {{ getTripPercent(trip) }}%
+                </span>
+              </div>
+              <div class="progress-bar-bg">
+                <div
+                  class="progress-bar-fill"
+                  [style.width.%]="getTripPercent(trip)"
+                  [class.complete]="getTripPercent(trip) === 100 && trip.valorizedCount > 0"
+                ></div>
+              </div>
+            </div>
+
+            <div class="trip-card-meta">
+              <span class="meta-date">Creato {{ formatCreatedAt(trip.createdAt) }}</span>
+              <span class="card-action-link">Apri valigia →</span>
+            </div>
+          </div>
+        </a>
+      }
+    </div>
+
+    <!-- Empty Search Results (if user filtered and no results match) -->
+    @if (sortedTrips().length === 0 && searchQuery()) {
+      <div class="empty-search-state">
+        <p>Nessun viaggio trovato corrispondente a "<strong>{{ searchQuery() }}</strong>".</p>
+        <button class="btn btn-secondary btn-sm" (click)="searchQuery.set('')">Reimposta ricerca</button>
+      </div>
+    }
+
+    <!-- Pagination Controls -->
+    @if (totalPages() > 1) {
+      <nav class="pagination-nav" aria-label="Paginazione viaggi">
+        <div class="pagination-info">
+          Mostrando {{ (currentPage() - 1) * pageSize + 1 }}-{{
+            currentPage() * pageSize > sortedTrips().length ? sortedTrips().length : currentPage() * pageSize
+          }} di {{ sortedTrips().length }} viaggi
+        </div>
+
+        <div class="pagination-buttons">
+          <button
+            class="btn btn-secondary btn-sm"
+            [disabled]="currentPage() === 1"
+            (click)="goToPage(currentPage() - 1)"
+            aria-label="Pagina precedente"
+          >
+            ← Precedente
+          </button>
+
+          <div class="page-numbers">
+            @for (page of pageList(); track page) {
+              <button
+                class="page-btn"
+                [class.active]="page === currentPage()"
+                (click)="goToPage(page)"
+                [attr.aria-current]="page === currentPage() ? 'page' : null"
+              >
+                {{ page }}
+              </button>
+            }
+          </div>
+
+          <button
+            class="btn btn-secondary btn-sm"
+            [disabled]="currentPage() === totalPages()"
+            (click)="goToPage(currentPage() + 1)"
+            aria-label="Pagina successiva"
+          >
+            Successiva →
+          </button>
+        </div>
+      </nav>
+    }
+  }
+
+  <!-- Create Trip Modal -->
+  @if (showCreateModal()) {
+    <div class="modal-backdrop" [class.closing]="isModalClosing()" (click)="closeModal()">
+      <div class="modal-card" [class.closing]="isModalClosing()" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>✈️ Crea Nuovo Viaggio</h3>
+          <button class="modal-close" (click)="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="trip-title">Nome del viaggio *</label>
+            <input
+              id="trip-title"
+              type="text"
+              class="form-control"
+              placeholder="Es: Vacanze Estate Sicilia, Trasferta Milano, Settimana Bianca..."
+              [(ngModel)]="tripForm.title"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label for="trip-dest">Destinazione</label>
+            <input
+              id="trip-dest"
+              type="text"
+              class="form-control"
+              placeholder="Es: Palermo, Canazei, Roma..."
+              [(ngModel)]="tripForm.destination"
+            />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="trip-start">Data partenza</label>
+              <input
+                id="trip-start"
+                type="date"
+                class="form-control"
+                [(ngModel)]="tripForm.startDate"
+              />
+            </div>
+            <div class="form-group">
+              <label for="trip-end">Data rientro</label>
+              <input
+                id="trip-end"
+                type="date"
+                class="form-control"
+                [(ngModel)]="tripForm.endDate"
+              />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="trip-notes">Note generali</label>
+            <textarea
+              id="trip-notes"
+              rows="3"
+              class="form-control"
+              placeholder="Note, promemoria o equipaggiamento speciale per questa partenza..."
+              [(ngModel)]="tripForm.notes"
+            ></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="closeModal()">Annulla</button>
+          <button
+            class="btn btn-primary"
+            (click)="submitCreateTrip()"
+            [disabled]="!tripForm.title.trim()"
+          >
+            Crea Viaggio
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>
+

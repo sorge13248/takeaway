@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 200" width="760" height="200">
+  <defs>
+    <linearGradient id="hlHandle" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+
+    <linearGradient id="hlBody" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="45%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+
+    <linearGradient id="hlFlap" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#93c5fd" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+
+    <linearGradient id="hlPocket" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1e40af" />
+    </linearGradient>
+
+    <linearGradient id="hlBadge" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+
+    <linearGradient id="hlTag" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+
+    <filter id="hlShadow" x="-20%" y="-15%" width="140%" height="135%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#1e3a8a" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- Scaled Icon on Left (160x160 space, translated to 20, 20) -->
+  <g transform="translate(20, 16) scale(0.33)" filter="url(#hlShadow)">
+    <path d="M 212 110 C 212 68, 300 68, 300 110" fill="none" stroke="#1d4ed8" stroke-width="22" stroke-linecap="round" />
+    <path d="M 216 110 C 216 75, 296 75, 296 110" fill="none" stroke="url(#hlHandle)" stroke-width="14" stroke-linecap="round" />
+
+    <path d="M 160 190
+             C 160 118, 200 98, 256 98
+             C 312 98, 352 118, 352 190
+             L 366 365
+             C 368 405, 345 425, 306 425
+             L 206 425
+             C 167 425, 144 405, 146 365
+             Z"
+          fill="url(#hlBody)" />
+
+    <path d="M 172 190 C 172 135, 206 114, 256 114 C 306 114, 340 135, 340 190 L 340 210 L 172 210 Z"
+          fill="#ffffff" opacity="0.12" />
+
+    <path d="M 166 185
+             C 185 155, 220 145, 256 145
+             C 292 145, 327 155, 346 185
+             C 348 198, 335 210, 315 212
+             C 285 215, 227 215, 197 212
+             C 177 210, 164 198, 166 185 Z"
+          fill="url(#hlFlap)" />
+
+    <path d="M 188 190 C 220 178, 292 178, 324 190" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" opacity="0.85" />
+
+    <rect x="136" y="275" width="16" height="75" rx="8" fill="#1d4ed8" />
+    <rect x="138" y="277" width="12" height="71" rx="6" fill="#3b82f6" />
+    <rect x="360" y="275" width="16" height="75" rx="8" fill="#1d4ed8" />
+    <rect x="362" y="277" width="12" height="71" rx="6" fill="#3b82f6" />
+
+    <rect x="176" y="255" width="160" height="135" rx="26" fill="#172554" opacity="0.25" />
+    <rect x="176" y="250" width="160" height="135" rx="26" fill="url(#hlPocket)" stroke="#60a5fa" stroke-width="2" />
+    <path d="M 198 274 L 314 274" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.6" stroke-dasharray="6 5" />
+    
+    <g transform="translate(182, 230) rotate(-12)">
+      <rect x="0" y="0" width="16" height="26" rx="4" fill="url(#hlTag)" />
+      <circle cx="8" cy="5" r="2.5" fill="#ffffff" />
+    </g>
+
+    <circle cx="256" cy="335" r="42" fill="url(#hlBadge)" stroke="#ffffff" stroke-width="4.5" />
+    <path d="M 236 335 L 250 349 L 278 321" fill="none" stroke="#ffffff" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+
+  <!-- Typography: TakeAway -->
+  <text x="200" y="112" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="76" font-weight="800" fill="#0f172a" letter-spacing="-1.5">
+    Take<tspan fill="#2563eb">Away</tspan>
+  </text>
+
+  <!-- Subtitle: PACKING CHECKLIST -->
+  <text x="204" y="152" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="19" font-weight="700" fill="#64748b" letter-spacing="4.5">
+    PACKING CHECKLIST
+  </text>
+  
+  <!-- Subtle accent dot or badge -->
+  <circle cx="628" cy="88" r="8" fill="#10b981" />
+</svg>

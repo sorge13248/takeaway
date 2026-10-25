@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { CatalogCategory, ItemState, TripDetail, TripSummary, User } from './models';
+import { CatalogCategory, ItemState, OidcConfig, OidcMetadata, TripDetail, TripSummary, User } from './models';
 
 @Injectable({
   providedIn: 'root',
@@ -9,6 +9,14 @@ import { CatalogCategory, ItemState, TripDetail, TripSummary, User } from './mod
 export class ApiService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = '/api';
+
+  getOidcConfig(): Observable<OidcConfig> {
+    return this.http.get<OidcConfig>(`${this.baseUrl}/oidc/config`);
+  }
+
+  getOidcMetadata(): Observable<OidcMetadata> {
+    return this.http.get<OidcMetadata>(`${this.baseUrl}/oidc/metadata`);
+  }
 
   getMe(): Observable<User> {
     return this.http.get<User>(`${this.baseUrl}/me`);

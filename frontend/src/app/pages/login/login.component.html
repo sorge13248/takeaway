@@ -1,0 +1,25 @@
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-header">
+      <img src="/logo.webp" alt="TakeAway Logo" class="login-logo" width="56" height="56" />
+      <h1 class="login-title">TakeAway</h1>
+      <span class="login-subtitle">Packing Checklist</span>
+    </div>
+
+    @if (errorMessage) {
+      <div class="login-error" role="alert">
+        <span class="error-icon">⚠️</span>
+        <p>{{ errorMessage }}</p>
+      </div>
+    }
+
+    <p class="login-notice">
+      Accedi per utilizzare l'applicazione. Verrai reindirizzato per completare l'accesso.
+    </p>
+
+    <button type="button" class="btn btn-primary login-btn" (click)="onLogin()">
+      <span class="btn-icon">🔐</span>
+      <span>Accedi</span>
+    </button>
+  </div>
+</div>

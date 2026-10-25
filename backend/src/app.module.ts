@@ -1,6 +1,5 @@
-import { Module, OnApplicationBootstrap } from '@nestjs/common';
-import { TypeOrmModule, InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import './load-env.js';
 
 import { User } from './entities/user.entity.js';
@@ -13,6 +12,7 @@ import { TripItemState } from './entities/trip-item-state.entity.js';
 import { AuthController } from './auth.controller.js';
 import { HealthController } from './health.controller.js';
 import { MeController } from './me.controller.js';
+import { PublicController } from './public.controller.js';
 import { CatalogController } from './controllers/catalog.controller.js';
 import { TripsController } from './controllers/trips.controller.js';
 
@@ -20,7 +20,6 @@ import { BearerJwtGuard } from './common/auth/bearer-jwt.guard.js';
 import { UsersService } from './services/users.service.js';
 import { CatalogService } from './services/catalog.service.js';
 import { TripsService } from './services/trips.service.js';
-import { runCatalogSeeder } from './seed/main.seeder.js';
 
 @Module({
   imports: [
@@ -36,6 +35,7 @@ import { runCatalogSeeder } from './seed/main.seeder.js';
   controllers: [
     AuthController,
     HealthController,
+    PublicController,
     MeController,
     CatalogController,
     TripsController,
@@ -47,10 +47,4 @@ import { runCatalogSeeder } from './seed/main.seeder.js';
     TripsService,
   ],
 })
-export class AppModule implements OnApplicationBootstrap {
-  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
-
-  async onApplicationBootstrap() {
-    await runCatalogSeeder(this.dataSource);
-  }
-}
+export class AppModule {}

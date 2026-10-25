@@ -179,7 +179,7 @@ export class TripsService {
         tripId,
         itemId,
         status: dto.status ?? 'none',
-        quantity: dto.quantity !== undefined ? dto.quantity : 1,
+        quantity: dto.quantity !== undefined && dto.quantity !== null ? dto.quantity : 0,
         note: dto.note?.trim() || null,
       });
     } else {

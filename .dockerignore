@@ -9,6 +9,4 @@ dist
 deploy/data
 deploy/logs
 *.log
-Checklist viaggi-vacanze-trasferte.odt
-scratch_odt_extracted.json
 extracted_assets

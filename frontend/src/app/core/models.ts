@@ -6,6 +6,19 @@ export interface User {
   pictureUrl: string | null;
 }
 
+export interface OidcConfig {
+  issuerUrl: string;
+  clientId: string;
+  redirectUri: string;
+}
+
+export interface OidcMetadata {
+  authorization_endpoint: string;
+  token_endpoint: string;
+  end_session_endpoint?: string;
+  userinfo_endpoint?: string;
+}
+
 export interface CatalogItem {
   id: string;
   name: string;

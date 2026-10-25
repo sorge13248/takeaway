@@ -1,651 +1,76 @@
-<div class="app-container">
-  <!-- Top Navigation Bar -->
-  <header class="app-header">
-    <div class="header-left">
-      <div class="brand">
-        <span class="brand-icon">🎒</span>
-        <div class="brand-text">
-          <h1>TakeAway</h1>
-          <span class="brand-subtitle">Packing Checklist</span>
-        </div>
-      </div>
-
-      <!-- Trip Selector -->
-      @if (!loadingTrips() && trips().length > 0) {
-        <div class="trip-selector-wrapper">
-          <label for="trip-select" class="visually-hidden">Seleziona viaggio</label>
-          <select
-            id="trip-select"
-            class="trip-select"
-            [ngModel]="activeTripId()"
-            (ngModelChange)="selectTrip($event)"
-          >
-            @for (trip of trips(); track trip.id) {
-              <option [value]="trip.id">
-                ✈️ {{ trip.title }}{{ trip.destination ? ' (' + trip.destination + ')' : '' }}
-              </option>
-            }
-          </select>
-        </div>
-      }
-
-      <button class="btn btn-primary btn-sm" (click)="openCreateModal()">
-        <span>+</span> Nuovo Viaggio
-      </button>
-    </div>
-
-    <div class="header-right">
-      <!-- Dark mode toggle -->
-      <button class="btn-icon" (click)="toggleTheme()" [title]="isDarkMode() ? 'Modalità chiara' : 'Modalità scura'">
-        @if (isDarkMode()) {
-          <span>☀️</span>
-        } @else {
-          <span>🌙</span>
-        }
-      </button>
-
-      <!-- User badge / Profile -->
-      @if (auth.currentUser(); as user) {
-        <div class="user-pill" [title]="user.email || user.displayName">
-          <span class="user-avatar">👤</span>
-          <span class="user-name">{{ user.displayName }}</span>
-          <button class="btn-logout" (click)="auth.logout()" title="Disconnetti">🚪</button>
-        </div>
-      } @else {
-        <button class="btn btn-secondary btn-sm" (click)="auth.login()">
-          Accedi
-        </button>
-      }
-    </div>
-  </header>
-
-  <!-- Main Content -->
-  <main class="main-content">
-    @if (loadingTrips() || loadingCatalog()) {
-      <div class="loading-state">
-        <div class="spinner"></div>
-        <p>Caricamento lista e impostazioni...</p>
-      </div>
-    } @else if (trips().length === 0) {
-      <!-- Empty State: No Trips yet -->
-      <div class="empty-trips-card">
-        <div class="empty-icon">🧳</div>
-        <h2>Nessun viaggio creato</h2>
-        <p>
-          Crea il tuo primo viaggio per iniziare a organizzare la valigia! Tutti gli elementi della checklist
-          saranno subito disponibili e potrai spuntarli o valorizzarli solo quando necessario.
-        </p>
-        <button class="btn btn-primary btn-lg" (click)="openCreateModal()">
-          <span>+</span> Crea il tuo primo viaggio
-        </button>
-      </div>
-    } @else if (activeTrip(); as trip) {
-      <!-- Active Trip Dashboard Header -->
-      <section class="trip-banner">
-        <div class="trip-banner-main">
-          <div class="trip-info">
-            <div class="trip-title-row">
-              <h2>{{ trip.title }}</h2>
-              @if (trip.destination) {
-                <span class="trip-destination">📍 {{ trip.destination }}</span>
-              }
-            </div>
-            @if (trip.startDate || trip.endDate) {
-              <div class="trip-dates">
-                📅 {{ trip.startDate || '...' }} → {{ trip.endDate || '...' }}
-              </div>
-            }
-            @if (trip.notes) {
-              <p class="trip-notes">📝 {{ trip.notes }}</p>
-            }
+<div class="app-container" [class.is-login-page]="isLoginPage()">
+  <!-- Top Navigation Bar (hidden on login page) -->
+  @if (!isLoginPage()) {
+    <header class="app-header">
+      <div class="header-left">
+        <a routerLink="/" class="brand" title="Torna alla lista viaggi">
+          <img src="/logo.webp" alt="TakeAway Logo" class="brand-logo" width="34" height="34" />
+          <div class="brand-text">
+            <h1>TakeAway</h1>
+            <span class="brand-subtitle">Packing Checklist</span>
           </div>
+        </a>
+      </div>
 
-          <!-- Trip Stats & Progress -->
-          <div class="trip-stats-box">
-            <div class="stats-header">
-              <span class="stats-label">Avanzamento valigia:</span>
-              <span class="stats-value">
-                <strong>{{ tripStats().totalPacked }}</strong> di {{ tripStats().totalValorized }} oggetti pronti
-                ({{ tripStats().percent }}%)
+      <div class="header-right">
+        <!-- Dark mode toggle -->
+        <button class="btn-icon" (click)="toggleTheme()" [title]="isDarkMode() ? 'Modalità chiara' : 'Modalità scura'">
+          @if (isDarkMode()) {
+            <span>☀️</span>
+          } @else {
+            <span>🌙</span>
+          }
+        </button>
+
+        <!-- User badge / Profile -->
+        @if (auth.currentUser(); as user) {
+          <div class="user-pill" [title]="user.email || user.displayName">
+            @if (user.pictureUrl && !avatarLoadFailed()) {
+              <img
+                [src]="user.pictureUrl"
+                [alt]="user.displayName"
+                class="user-avatar-img"
+                referrerpolicy="no-referrer"
+                (error)="onAvatarError()"
+              />
+            } @else {
+              <span class="user-avatar-initials" [title]="user.displayName">
+                {{ auth.initials() }}
               </span>
-            </div>
-            <div class="progress-bar-bg">
-              <div
-                class="progress-bar-fill"
-                [style.width.%]="tripStats().percent"
-                [class.complete]="tripStats().percent === 100 && tripStats().totalValorized > 0"
-              ></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="trip-actions">
-          <button class="btn btn-secondary btn-sm" (click)="openEditModal()" title="Modifica dati viaggio">
-            ✏️ Modifica
-          </button>
-          <button
-            class="btn btn-secondary btn-sm"
-            (click)="openResetModal()"
-            title="Azzera tutte le spunte di questo viaggio"
-          >
-            🔄 Azzera spunte
-          </button>
-          <button
-            class="btn btn-danger-outline btn-sm"
-            (click)="openDeleteModal()"
-            title="Elimina questo viaggio"
-          >
-            🗑️ Elimina
-          </button>
-        </div>
-      </section>
-
-      <!-- Frontend-only Fast Filters Bar -->
-      <section class="filters-card">
-        <div class="search-and-status-row">
-          <!-- Text search -->
-          <div class="search-box">
-            <span class="search-icon">🔍</span>
-            <input
-              type="text"
-              class="search-input"
-              placeholder="Cerca per nome o indicazione (es: cintura, ray-ban, pile, autan)..."
-              [ngModel]="searchQuery()"
-              (ngModelChange)="searchQuery.set($event)"
-            />
-            @if (searchQuery()) {
-              <button class="clear-search" (click)="searchQuery.set('')" title="Pulisci ricerca">✕</button>
             }
+            <span class="user-name">{{ user.displayName }}</span>
+            <button class="btn-logout" (click)="auth.logout()" title="Disconnetti">🚪</button>
           </div>
-
-          <!-- Status Filter -->
-          <div class="filter-group">
-            <label for="status-filter">Stato:</label>
-            <select
-              id="status-filter"
-              class="filter-select"
-              [ngModel]="statusFilter()"
-              (ngModelChange)="statusFilter.set($event)"
-            >
-              <option value="all">Tutti gli oggetti</option>
-              <option value="valorized">⭐ Solo valorizzati (in lista)</option>
-              <option value="unvalorized">⬜ Da considerare / vuoti</option>
-              <option value="packed">🧳 In valigia</option>
-              <option value="worn">👕 Indossati alla partenza (+)</option>
-              <option value="car">🚗 In auto (Auris)</option>
-              <option value="to_pack_last">⚠️ Da mettere all'ultimo (*)</option>
-            </select>
-          </div>
-
-          <!-- Category Filter -->
-          <div class="filter-group">
-            <label for="category-filter">Sezione:</label>
-            <select
-              id="category-filter"
-              class="filter-select"
-              [ngModel]="categoryFilter()"
-              (ngModelChange)="categoryFilter.set($event)"
-            >
-              <option value="all">Tutte le sezioni</option>
-              @for (cat of catalog(); track cat.slug) {
-                <option [value]="cat.slug">{{ cat.name }}</option>
-              }
-            </select>
-          </div>
-        </div>
-
-        <!-- Tag Chips & Expand Controls -->
-        <div class="tags-and-view-row">
-          <div class="tag-chips">
-            <span class="filter-label">Clima & Trasporto:</span>
-            <button
-              class="chip"
-              [class.active]="tagFilter() === 'all'"
-              (click)="tagFilter.set('all')"
-            >
-              Tutti
-            </button>
-            <button
-              class="chip tag-summer"
-              [class.active]="tagFilter() === 'estate'"
-              (click)="tagFilter.set(tagFilter() === 'estate' ? 'all' : 'estate')"
-            >
-              ☀️ Estate/caldo
-            </button>
-            <button
-              class="chip tag-winter"
-              [class.active]="tagFilter() === 'inverno'"
-              (click)="tagFilter.set(tagFilter() === 'inverno' ? 'all' : 'inverno')"
-            >
-              ❄️ Inverno/freddo
-            </button>
-            <button
-              class="chip tag-night"
-              [class.active]="tagFilter() === 'sera'"
-              (click)="tagFilter.set(tagFilter() === 'sera' ? 'all' : 'sera')"
-            >
-              🌙 Sera/notte
-            </button>
-            <button
-              class="chip tag-flight"
-              [class.active]="tagFilter() === 'aereo'"
-              (click)="tagFilter.set(tagFilter() === 'aereo' ? 'all' : 'aereo')"
-            >
-              ✈️ Aereo
-            </button>
-            <button
-              class="chip tag-train"
-              [class.active]="tagFilter() === 'treno'"
-              (click)="tagFilter.set(tagFilter() === 'treno' ? 'all' : 'treno')"
-            >
-              🚆 Treno
-            </button>
-            <button
-              class="chip tag-ferry"
-              [class.active]="tagFilter() === 'traghetto'"
-              (click)="tagFilter.set(tagFilter() === 'traghetto' ? 'all' : 'traghetto')"
-            >
-              🚢 Traghetto
-            </button>
-          </div>
-
-          <div class="view-controls">
-            <button class="btn-text" (click)="expandAll()">Espandi tutti</button>
-            <span class="divider">|</span>
-            <button class="btn-text" (click)="collapseAll()">Comprimi tutti</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- Checklist Categories List -->
-      <section class="categories-container">
-        @for (category of filteredCatalog(); track category.slug) {
-          <div class="category-card" [class.collapsed]="collapsedCategories()[category.slug]">
-            <!-- Category Header -->
-            <div class="category-header" (click)="toggleCategory(category.slug)">
-              <div class="category-title-left">
-                <span class="category-icon">{{ category.icon === 'mountain' ? '🏔️' : category.icon === 'umbrella' ? '🏖️' : category.icon === 'briefcase' ? '💼' : category.icon === 'dice' ? '🎲' : category.icon === 'sparkles' ? '✨' : category.icon === 'file-text' ? '📄' : category.icon === 'shirt' ? '👕' : category.icon === 'scissors' ? '👖' : category.icon === 'heart' ? '🧦' : category.icon === 'gem' ? '💍' : category.icon === 'smile' ? '🪥' : category.icon === 'utensils' ? '🥪' : category.icon === 'cross' ? '💊' : category.icon === 'cpu' ? '🔌' : '📦' }}</span>
-                <div class="category-names">
-                  <h3>{{ category.name }}</h3>
-                  @if (category.parentGroup) {
-                    <span class="parent-group">{{ category.parentGroup }}</span>
-                  }
-                </div>
-              </div>
-
-              <div class="category-header-right">
-                <div class="category-badges">
-                  <span class="badge badge-neutral" title="Oggetti visualizzati in questa sezione">
-                    {{ category.filteredItems.length }}
-                  </span>
-                  @if (category.valorizedCount > 0) {
-                    <span class="badge badge-success" title="Oggetti pronti / totali in lista per questa categoria">
-                      {{ category.packedCount }}/{{ category.valorizedCount }} pronti
-                    </span>
-                  }
-                </div>
-                <span class="chevron" [class.rotate]="collapsedCategories()[category.slug]">▼</span>
-              </div>
-            </div>
-
-            <!-- Category Items Table/List -->
-            @if (!collapsedCategories()[category.slug]) {
-              <div class="category-body">
-                @if (category.filteredItems.length === 0) {
-                  <p class="no-items-message">Nessun oggetto corrisponde ai filtri selezionati in questa sezione.</p>
-                } @else {
-                  <div class="items-list">
-                    @for (item of category.filteredItems; track item.id) {
-                      @let state = getItemState(item.id);
-                      @let isItemValorized = (state.status && state.status !== 'none') || (state.quantity !== null && state.quantity !== undefined && state.quantity > 0) || (state.note && state.note.trim().length > 0);
-
-                      <div
-                        class="item-row"
-                        [class.valorized]="isItemValorized"
-                        [class.packed]="state.status === 'packed'"
-                        [class.worn]="state.status === 'worn'"
-                        [class.car]="state.status === 'car'"
-                        [class.last-minute]="state.status === 'to_pack_last'"
-                      >
-                        <!-- Item Left: Name, Badges & Notes -->
-                        <div class="item-info">
-                          <div class="item-header-line">
-                            <span class="item-name">{{ item.name }}</span>
-
-                            <!-- Tags (Sun, Snow, etc) -->
-                            @for (tag of item.tags; track tag) {
-                              @let tagInfo = getTagInfo(tag);
-                              <span class="item-tag-badge" [class]="tagInfo.class" [title]="tagInfo.label">
-                                {{ tagInfo.emoji }}
-                              </span>
-                            }
-
-                            <!-- Special Attributes Badges -->
-                            @if (item.toBuy) {
-                              <span class="badge badge-warning" title="Da acquistare prima della partenza">
-                                🛒 DA ACQUISTARE
-                              </span>
-                            }
-                            @if (item.minDays) {
-                              <span class="badge badge-purple" title="Consigliato per viaggi di oltre 5 giorni">
-                                ⏱️ > {{ item.minDays }} giorni
-                              </span>
-                            }
-                            @if (item.isPreparation) {
-                              <span class="badge badge-info" title="Azione di preparazione personale pre-partenza">
-                                ✨ Preparazione
-                              </span>
-                            }
-                            @if (item.imageUrl) {
-                              <button
-                                class="btn-thumbnail"
-                                (click)="openLightbox(item.imageUrl, item.name)"
-                                title="Visualizza foto"
-                              >
-                                📷 Foto
-                              </button>
-                            }
-                          </div>
-
-                          @if (item.description) {
-                            <div class="item-description">
-                              💡 {{ item.description }}
-                            </div>
-                          }
-                        </div>
-
-                        <!-- Item Controls (Quantity, Status, Note, Reset) -->
-                        <div class="item-controls">
-                          <!-- Quantity Counter -->
-                          <div class="quantity-counter">
-                            <button
-                              class="counter-btn"
-                              (click)="onQuantityChange(item, -1)"
-                              title="Diminuisci quantità"
-                              [disabled]="(state.quantity ?? 1) <= 0"
-                            >
-                              -
-                            </button>
-                            <input
-                              type="number"
-                              class="quantity-input"
-                              [value]="state.quantity ?? item.defaultQuantity ?? 1"
-                              (change)="onQuantityInput(item, $event)"
-                              min="0"
-                              max="99"
-                              title="Quantità (inserisci un numero libero)"
-                            />
-                            <button
-                              class="counter-btn"
-                              (click)="onQuantityChange(item, 1)"
-                              title="Aumenta quantità"
-                            >
-                              +
-                            </button>
-                          </div>
-
-                          <!-- Status HTML Select with Emoji Options -->
-                          <div class="status-select-wrapper">
-                            <select
-                              class="status-select"
-                              [value]="state.status || 'none'"
-                              (change)="onStatusChange(item, $event)"
-                              [class.status-packed]="state.status === 'packed'"
-                              [class.status-worn]="state.status === 'worn'"
-                              [class.status-car]="state.status === 'car'"
-                              [class.status-last]="state.status === 'to_pack_last'"
-                            >
-                              @for (opt of statusOptions; track opt.value) {
-                                <option [value]="opt.value">
-                                  {{ opt.emoji }} {{ opt.label }}
-                                </option>
-                              }
-                            </select>
-                          </div>
-
-                          <!-- Specific Note Input -->
-                          <div class="note-input-wrapper">
-                            <input
-                              type="text"
-                              class="note-input"
-                              placeholder="Note specifiche (es: cintura CK, polo blu)..."
-                              [value]="state.note || ''"
-                              (input)="onNoteInput(item, $event)"
-                            />
-                          </div>
-
-                          <!-- Quick Reset Button -->
-                          @if (isItemValorized) {
-                            <button
-                              class="btn-reset-item"
-                              (click)="resetItem(item)"
-                              title="Rimuovi da questo viaggio (libera spazio nel DB)"
-                            >
-                              ✕
-                            </button>
-                          }
-                        </div>
-                      </div>
-                    }
-                  </div>
-                }
-              </div>
-            }
-          </div>
+        } @else {
+          <button class="btn btn-secondary btn-sm" (click)="auth.login()">
+            Accedi
+          </button>
         }
-      </section>
+      </div>
+    </header>
+  }
+
+  <!-- Routed Page Content -->
+  <main class="main-content">
+    @if (auth.loading()) {
+      <div class="app-auth-loading">
+        <div class="spinner"></div>
+        <p>Verifica autenticazione...</p>
+      </div>
     }
+    <router-outlet></router-outlet>
   </main>
 
-  <!-- Create Trip Modal -->
-  @if (showCreateModal()) {
-    <div class="modal-backdrop" [class.closing]="isModalClosing()" (click)="closeAllModals()">
-      <div class="modal-card" [class.closing]="isModalClosing()" (click)="$event.stopPropagation()">
-        <div class="modal-header">
-          <h3>✈️ Crea Nuovo Viaggio</h3>
-          <button class="modal-close" (click)="closeAllModals()">✕</button>
+  <!-- Application Footer (hidden on login page) -->
+  @if (!isLoginPage()) {
+    <footer class="app-footer">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <img src="/logo.webp" alt="TakeAway Logo" class="footer-logo" width="22" height="22" />
+          <span>TakeAway &bull; Packing Checklist</span>
         </div>
-        <div class="modal-body">
-          <div class="form-group">
-            <label for="trip-title">Nome del viaggio *</label>
-            <input
-              id="trip-title"
-              type="text"
-              class="form-control"
-              placeholder="Es: Vacanze Estate Sicilia, Trasferta Milano, Settimana Bianca..."
-              [(ngModel)]="tripForm.title"
-              required
-            />
-          </div>
-          <div class="form-group">
-            <label for="trip-dest">Destinazione</label>
-            <input
-              id="trip-dest"
-              type="text"
-              class="form-control"
-              placeholder="Es: Palermo, Canazei, Roma..."
-              [(ngModel)]="tripForm.destination"
-            />
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="trip-start">Data partenza</label>
-              <input
-                id="trip-start"
-                type="date"
-                class="form-control"
-                [(ngModel)]="tripForm.startDate"
-              />
-            </div>
-            <div class="form-group">
-              <label for="trip-end">Data rientro</label>
-              <input
-                id="trip-end"
-                type="date"
-                class="form-control"
-                [(ngModel)]="tripForm.endDate"
-              />
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="trip-notes">Note generali</label>
-            <textarea
-              id="trip-notes"
-              rows="3"
-              class="form-control"
-              placeholder="Note, promemoria o equipaggiamento speciale per questa partenza..."
-              [(ngModel)]="tripForm.notes"
-            ></textarea>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" (click)="closeAllModals()">Annulla</button>
-          <button
-            class="btn btn-primary"
-            (click)="submitCreateTrip()"
-            [disabled]="!tripForm.title.trim()"
-          >
-            Crea Viaggio
-          </button>
-        </div>
+        <p class="footer-tagline">Organizza i tuoi viaggi senza dimenticare nulla.</p>
       </div>
-    </div>
-  }
-
-  <!-- Edit Trip Modal -->
-  @if (showEditModal()) {
-    <div class="modal-backdrop" [class.closing]="isModalClosing()" (click)="closeAllModals()">
-      <div class="modal-card" [class.closing]="isModalClosing()" (click)="$event.stopPropagation()">
-        <div class="modal-header">
-          <h3>✏️ Modifica Viaggio</h3>
-          <button class="modal-close" (click)="closeAllModals()">✕</button>
-        </div>
-        <div class="modal-body">
-          <div class="form-group">
-            <label for="edit-title">Nome del viaggio *</label>
-            <input
-              id="edit-title"
-              type="text"
-              class="form-control"
-              [(ngModel)]="tripForm.title"
-              required
-            />
-          </div>
-          <div class="form-group">
-            <label for="edit-dest">Destinazione</label>
-            <input
-              id="edit-dest"
-              type="text"
-              class="form-control"
-              [(ngModel)]="tripForm.destination"
-            />
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="edit-start">Data partenza</label>
-              <input
-                id="edit-start"
-                type="date"
-                class="form-control"
-                [(ngModel)]="tripForm.startDate"
-              />
-            </div>
-            <div class="form-group">
-              <label for="edit-end">Data rientro</label>
-              <input
-                id="edit-end"
-                type="date"
-                class="form-control"
-                [(ngModel)]="tripForm.endDate"
-              />
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="edit-notes">Note generali</label>
-            <textarea
-              id="edit-notes"
-              rows="3"
-              class="form-control"
-              [(ngModel)]="tripForm.notes"
-            ></textarea>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" (click)="closeAllModals()">Annulla</button>
-          <button
-            class="btn btn-primary"
-            (click)="submitEditTrip()"
-            [disabled]="!tripForm.title.trim()"
-          >
-            Salva Modifiche
-          </button>
-        </div>
-      </div>
-    </div>
-  }
-
-  <!-- Reset Trip Modal -->
-  @if (showResetModal()) {
-    <div class="modal-backdrop" [class.closing]="isModalClosing()" (click)="closeAllModals()">
-      <div class="modal-card modal-sm" [class.closing]="isModalClosing()" (click)="$event.stopPropagation()">
-        <div class="modal-header">
-          <h3>🔄 Conferma Azzeramento</h3>
-          <button class="modal-close" (click)="closeAllModals()">✕</button>
-        </div>
-        <div class="modal-body">
-          <p>
-            Sei sicuro di voler azzerare tutti gli oggetti per il viaggio
-            <strong>"{{ activeTrip()?.title }}"</strong>?
-          </p>
-          <p class="text-muted" style="margin-top: 8px;">
-            Tutte le quantità, gli stati e le note salvate per questo viaggio verranno rimossi dal database.
-          </p>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" (click)="closeAllModals()">Annulla</button>
-          <button class="btn btn-danger" (click)="confirmResetTrip()">Azzera Tutto</button>
-        </div>
-      </div>
-    </div>
-  }
-
-  <!-- Delete Trip Modal -->
-  @if (showDeleteModal()) {
-    <div class="modal-backdrop" [class.closing]="isModalClosing()" (click)="closeAllModals()">
-      <div class="modal-card modal-sm" [class.closing]="isModalClosing()" (click)="$event.stopPropagation()">
-        <div class="modal-header">
-          <h3>🗑️ Elimina Viaggio</h3>
-          <button class="modal-close" (click)="closeAllModals()">✕</button>
-        </div>
-        <div class="modal-body">
-          <p>
-            Vuoi davvero eliminare definitivamente il viaggio
-            <strong>"{{ activeTrip()?.title }}"</strong>?
-          </p>
-          <p class="text-danger" style="margin-top: 8px;">
-            L'operazione non è reversibile.
-          </p>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" (click)="closeAllModals()">Annulla</button>
-          <button class="btn btn-danger" (click)="confirmDeleteTrip()">Elimina Viaggio</button>
-        </div>
-      </div>
-    </div>
-  }
-
-  <!-- Image Lightbox Modal -->
-  @if (lightboxImage(); as img) {
-    <div class="modal-backdrop" [class.closing]="isModalClosing()" (click)="closeAllModals()">
-      <div class="lightbox-content" [class.closing]="isModalClosing()" (click)="$event.stopPropagation()">
-        <div class="lightbox-header">
-          <span>{{ img.title }}</span>
-          <button class="modal-close" (click)="closeAllModals()">✕</button>
-        </div>
-        <div class="lightbox-body">
-          <img [src]="img.url" [alt]="img.title" class="lightbox-img" />
-        </div>
-      </div>
-    </div>
+    </footer>
   }
 </div>

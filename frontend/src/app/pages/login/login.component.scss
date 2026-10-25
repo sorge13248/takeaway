@@ -1,0 +1,133 @@
+:host {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.login-page {
+  flex: 1;
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  text-align: center;
+  animation: fadeIn 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.login-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+
+  .login-logo {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    margin-bottom: 2px;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.08));
+  }
+
+  .login-title {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--primary);
+    line-height: 1.1;
+  }
+
+  .login-subtitle {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+}
+
+.login-error {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background-color: var(--danger-light);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  font-size: 13px;
+  text-align: left;
+
+  .error-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  p {
+    margin: 0;
+    line-height: 1.35;
+  }
+}
+
+.login-notice {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+  transition: all 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  .btn-icon {
+    font-size: 16px;
+  }
+}

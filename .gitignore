@@ -7,5 +7,4 @@ dist/
 *.tsbuildinfo
 *.log
 .DS_Store
-scratch_odt_extracted.json
 extracted_assets/

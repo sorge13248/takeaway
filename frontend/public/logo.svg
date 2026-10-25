@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="lmHandle" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+
+    <linearGradient id="lmBody" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="45%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+
+    <linearGradient id="lmFlap" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#93c5fd" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+
+    <linearGradient id="lmPocket" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1e40af" />
+    </linearGradient>
+
+    <linearGradient id="lmBadge" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+
+    <linearGradient id="lmTag" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+
+    <filter id="lmDropShadow" x="-20%" y="-15%" width="140%" height="135%">
+      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#1e3a8a" flood-opacity="0.30" />
+    </filter>
+
+    <filter id="lmBadgeGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#059669" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <g filter="url(#lmDropShadow)">
+    <!-- Top Handle Arch -->
+    <path d="M 212 110 C 212 68, 300 68, 300 110" fill="none" stroke="#1d4ed8" stroke-width="22" stroke-linecap="round" />
+    <path d="M 216 110 C 216 75, 296 75, 296 110" fill="none" stroke="url(#lmHandle)" stroke-width="14" stroke-linecap="round" />
+
+    <!-- Backpack Body -->
+    <path d="M 160 190
+             C 160 118, 200 98, 256 98
+             C 312 98, 352 118, 352 190
+             L 366 365
+             C 368 405, 345 425, 306 425
+             L 206 425
+             C 167 425, 144 405, 146 365
+             Z"
+          fill="url(#lmBody)" />
+
+    <!-- Inner Highlight Arc -->
+    <path d="M 172 190 C 172 135, 206 114, 256 114 C 306 114, 340 135, 340 190 L 340 210 L 172 210 Z"
+          fill="#ffffff" opacity="0.12" />
+
+    <!-- Top Compartment Flap -->
+    <path d="M 166 185
+             C 185 155, 220 145, 256 145
+             C 292 145, 327 155, 346 185
+             C 348 198, 335 210, 315 212
+             C 285 215, 227 215, 197 212
+             C 177 210, 164 198, 166 185 Z"
+          fill="url(#lmFlap)" />
+
+    <!-- Top Zipper Accent -->
+    <path d="M 188 190 C 220 178, 292 178, 324 190" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" opacity="0.85" />
+
+    <!-- Side Pockets -->
+    <rect x="136" y="275" width="16" height="75" rx="8" fill="#1d4ed8" />
+    <rect x="138" y="277" width="12" height="71" rx="6" fill="#3b82f6" />
+
+    <rect x="360" y="275" width="16" height="75" rx="8" fill="#1d4ed8" />
+    <rect x="362" y="277" width="12" height="71" rx="6" fill="#3b82f6" />
+
+    <!-- Front Pocket Shadow -->
+    <rect x="176" y="255" width="160" height="135" rx="26" fill="#172554" opacity="0.25" />
+    
+    <!-- Front Pocket Body -->
+    <rect x="176" y="250" width="160" height="135" rx="26" fill="url(#lmPocket)" stroke="#60a5fa" stroke-width="2" />
+
+    <!-- Front Zipper Line -->
+    <path d="M 198 274 L 314 274" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.6" stroke-dasharray="6 5" />
+    
+    <!-- Luggage Tag -->
+    <g transform="translate(182, 230) rotate(-12)">
+      <rect x="0" y="0" width="16" height="26" rx="4" fill="url(#lmTag)" />
+      <circle cx="8" cy="5" r="2.5" fill="#ffffff" />
+    </g>
+
+    <!-- Checklist / Verified Badge -->
+    <g filter="url(#lmBadgeGlow)">
+      <circle cx="256" cy="335" r="42" fill="url(#lmBadge)" stroke="#ffffff" stroke-width="4.5" />
+      <path d="M 236 335 L 250 349 L 278 321" fill="none" stroke="#ffffff" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
+  </g>
+</svg>

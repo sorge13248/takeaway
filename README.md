@@ -25,27 +25,17 @@ Permette di organizzare e spuntare tutti gli oggetti da portare in viaggio, gest
 
 ---
 
-## 📋 Struttura del Catalogo (estratta dall'ODT)
+## 📋 Struttura del Catalogo e Modello Dati
 
-Il catalogo iniziale è stato popolato direttamente estraendo e normalizzando tutti gli elementi del documento `Checklist viaggi-vacanze-trasferte.odt`:
+Il database parte vuoto ed è strutturato per organizzare sezioni (categorie) e oggetti (item) configurabili:
 
-* **16 Sezioni / Categorie**:
-  1. ✨ *Preparazione pre-partenza* (unghie, barba, doccia)
-  2. 📄 *Documenti di viaggio* (carta d'identità valida per l'espatrio, patente, tessera sanitaria, passaporto, carte d'imbarco)
-  3. 🎖️ *Tessere sconti & Extra* (CAI, Libera, Legambiente, Coop Alleanza 3.0)
-  4. 🧢 *Abbigliamento - Accessori* (berretto con visiera/lana, occhiali da sole Ray-Ban/sport, guanti, sciarpa, cinture 4cm/3.5cm/3cm)
-  5. 👕 *Abbigliamento - Busto* (giacche, k-way, camicie, polo, t-shirt, canottiere, sotto-felpe, felpe, pile, maglioni, pigiama)
-  6. 👖 *Abbigliamento - Gambe* (jeans leggeri/pesanti, chino, tela, lino, bermuda, scarpe, sandali, ciabatte)
-  7. 🧦 *Abbigliamento - Intimo* (magliette intime scollo tondo/V, trunk, calzini cotone/lana/tecnici, sacchetti)
-  8. 💍 *Abbigliamento - Gioielli* (braccialetto Maserati con foto, braccialetto nero-argento, collanina capricorno)
-  9. 🪥 *Cura personale* (spazzolino elettrico, rasoio, profumo, burro cacao, gocce capelli, regole per viaggi > 5 giorni)
-  10. 🥪 *Alimenti & Spuntini* (pranzo al sacco, borracce termiche, snack, contenitori, sacchetti)
-  11. 💊 *Medicine ed integratori* (antiacne, loniten, finasteride, carexidil, tachipirina, momentact, termometro)
-  12. 🔌 *Accessori & Tech* (organizer cavi, Galaxy Watch 5, Buds 2 Pro, cavi, power bank, Kindle, hub HDMI)
-  13. 🏔️ *Montagna* (scarponi, bastoncini, pantaloni tecnici Decathlon, pile CMP, ramponcini, anti-zecche, torcia frontale)
-  14. 🏖️ *Mare & Spiaggia* (telo mare, protezioni solari, doposole, scarpe scoglio, costumi, kit snorkeling, tenda/ombrellone con punta in metallo)
-  15. 🎲 *Giochi & Svago* (carte Uno, Unstable Unicorns, Taboo, Cocoridò, What Do You Meme?, palloni, bocce, racchettoni)
-  16. 💼 *Lavoro* (badge, buoni pasto, computer, mouse, tappetino, cuffie, telefono)
+* **Sezioni / Categorie (`categories`)**:
+  * Raggruppano gli oggetti per contesto o tipologia (es. Documenti, Abbigliamento, Cura personale, Accessori tech, ecc.).
+  * Supportano icone, ordinamento personalizzato e gruppi gerarchici (`parentGroup`).
+
+* **Oggetti (`items`)**:
+  * Elementi del catalogo con quantità predefinita (`defaultQuantity`), note/descrizioni e attributi speciali (es. `isPreparation`, `toBuy`, `minDays`, foto allegata).
+  * Possono essere associati a una o più categorie tramite la tabella ponte `category_items`.
 
 * **Icone e Tag Climatici / Trasporto**:
   * ☀️ `estate` (Estate / caldo)
@@ -54,14 +44,16 @@ Il catalogo iniziale è stato popolato direttamente estraendo e normalizzando tu
   * ✈️ `aereo`
   * 🚆 `treno`
   * 🚢 `traghetto`
-* **Stati dell'oggetto**:
+
+* **Stati dell'oggetto per viaggio (`trip_item_states`)**:
   * ⬜ *Non selezionato / da considerare*
   * 🧳 *In valigia*
   * 👕 *Indossato alla partenza (+)*
-  * 🚗 *In auto (Auris)*
+  * 🚗 *In auto*
   * ⚠️ *Da mettere all'ultimo (*)*
+
 * **Ottimizzazione DB**:
-  * Vengono salvati nella tabella `trip_item_states` solo gli oggetti che hanno uno stato valorizzato, quantità > 0 o note personalizzate. Gli elementi non selezionati non occupano alcuna riga nel database.
+  * Vengono salvati nella tabella `trip_item_states` solo gli oggetti che hanno uno stato valorizzato, quantità > 0 o note personalizzate per quel viaggio. Gli elementi non selezionati non occupano alcuna riga nel database.
 
 ---
 

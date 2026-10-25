@@ -39,6 +39,7 @@ const COOKIE_REFRESH_TOKEN = 'takeaway_rt';
 const COOKIE_STATE = 'takeaway_oidc_state';
 const COOKIE_VERIFIER = 'takeaway_oidc_verifier';
 const COOKIE_NONCE = 'takeaway_oidc_nonce';
+const COOKIE_RETURN_URL = 'takeaway_return_url';
 
 function parseCookieHeader(header: string | undefined): Record<string, string> {
   if (!header) {
@@ -87,13 +88,32 @@ async function codeChallenge(verifier: string) {
 export class AuthController {
   private metadataCache: { value: OidcMetadata; fetchedAt: number } | null = null;
 
-  @Get('login')
-  async login(@Res({ passthrough: true }) response: HttpResponse) {
+  @Get('config')
+  getConfig() {
     const mockEnabled = process.env.AUTH_MOCK_ENABLED === 'true' || !process.env.OIDC_ISSUER_URL;
+    return {
+      oidcEnabled: !mockEnabled,
+    };
+  }
+
+  @Get('login')
+  async login(
+    @Query('returnUrl') returnUrl: string | undefined,
+    @Res({ passthrough: true }) response: HttpResponse,
+  ) {
+    const mockEnabled = process.env.AUTH_MOCK_ENABLED === 'true' || !process.env.OIDC_ISSUER_URL;
+    const safeReturn = this.sanitizeReturnUrl(returnUrl);
+
     if (mockEnabled) {
       response.cookie(COOKIE_ACCESS_TOKEN, 'mock-token', this.sessionCookieOptions(86400));
-      response.redirect(this.frontendRedirectUrl('/?auth=success'));
+      response.redirect(this.frontendRedirectUrl(safeReturn ?? '/?auth=success'));
       return;
+    }
+
+    if (safeReturn) {
+      response.cookie(COOKIE_RETURN_URL, safeReturn, this.pkceCookieOptions());
+    } else {
+      response.clearCookie(COOKIE_RETURN_URL, this.pkceCookieOptions());
     }
 
     const metadata = await this.getMetadata();
@@ -131,9 +151,12 @@ export class AuthController {
     const cookies = parseCookieHeader(request.headers.cookie);
     const expectedState = cookies[COOKIE_STATE];
     const verifier = cookies[COOKIE_VERIFIER];
+    const returnUrlCookie = cookies[COOKIE_RETURN_URL];
 
     if (!code || !state || !expectedState || !verifier || state !== expectedState) {
-      throw new UnauthorizedException('Invalid OIDC callback state');
+      this.clearPkceCookies(response);
+      response.redirect(this.frontendRedirectUrl('/login?error=invalid_state'));
+      return;
     }
 
     const metadata = await this.getMetadata();
@@ -153,12 +176,16 @@ export class AuthController {
     });
 
     if (!tokenResponse.ok) {
-      throw new UnauthorizedException(`OIDC token exchange failed (${tokenResponse.status})`);
+      this.clearPkceCookies(response);
+      response.redirect(this.frontendRedirectUrl('/login?error=token_exchange_failed'));
+      return;
     }
 
     const tokens = (await tokenResponse.json()) as TokenResponse;
     if (!tokens.access_token) {
-      throw new UnauthorizedException('OIDC token response is missing access_token');
+      this.clearPkceCookies(response);
+      response.redirect(this.frontendRedirectUrl('/login?error=missing_token'));
+      return;
     }
 
     this.clearPkceCookies(response);
@@ -176,7 +203,8 @@ export class AuthController {
       response.clearCookie(COOKIE_REFRESH_TOKEN, this.refreshCookieOptions());
     }
 
-    response.redirect(this.frontendRedirectUrl('/?auth=success'));
+    const targetUrl = this.sanitizeReturnUrl(returnUrlCookie) ?? '/?auth=success';
+    response.redirect(this.frontendRedirectUrl(targetUrl));
   }
 
   @Post('logout')
@@ -252,6 +280,18 @@ export class AuthController {
     response.clearCookie(COOKIE_STATE, options);
     response.clearCookie(COOKIE_VERIFIER, options);
     response.clearCookie(COOKIE_NONCE, options);
+    response.clearCookie(COOKIE_RETURN_URL, options);
+  }
+
+  private sanitizeReturnUrl(returnUrl?: string): string | null {
+    if (!returnUrl) {
+      return null;
+    }
+    const trimmed = returnUrl.trim();
+    if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.startsWith('/api')) {
+      return trimmed;
+    }
+    return null;
   }
 
   private isSecureCookie() {

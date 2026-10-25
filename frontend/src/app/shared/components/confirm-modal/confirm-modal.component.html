@@ -1,0 +1,27 @@
+<section class="modal-shell" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title">
+  <header>
+    <div class="header-icon">⚠️</div>
+    <div class="header-text">
+      <h2 id="confirm-title">{{ data.title }}</h2>
+      <p>{{ data.message }}</p>
+    </div>
+  </header>
+
+  <footer>
+    @if (data.showCancel !== false && data.cancelLabel !== null) {
+      <button type="button" class="btn btn-secondary" (click)="close()">
+        {{ data.cancelLabel || 'Annulla' }}
+      </button>
+    }
+    <button
+      type="button"
+      class="btn"
+      [class.btn-primary]="data.confirmVariant !== 'danger'"
+      [class.btn-danger]="data.confirmVariant === 'danger'"
+      (click)="confirm()"
+    >
+      {{ data.confirmLabel || 'Conferma' }}
+    </button>
+  </footer>
+</section>
+
