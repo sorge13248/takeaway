@@ -16,12 +16,15 @@ Permette di organizzare e spuntare tutti gli oggetti da portare in viaggio, gest
 * **Frontend**:
   * **Angular** moderno (Signals, Standalone Components, Angular CDK, SCSS)
   * Layout responsive ottimizzato per smartphone, tablet e desktop
+  * Foto profilo OIDC tonda con fallback su badge iniziale utente
+  * Monitoraggio attivo della sessione (ping ogni 30s fuori dalla zone Angular, interceptor HTTP con `withCredentials`, modale di sessione scaduta con animazioni stile Windows 7 Aero)
   * Filtri istantanei lato client (ricerca full-text, filtro per stato, filtro per stagione/trasporto, salto rapido tra sezioni)
   * Sincronizzazione immediata degli elementi cross-reference/marker (se un oggetto appartiene a più categorie, la modifica si riflette in tempo reale ovunque)
 * **Produzione & Container**:
   * **Dockerfile multi-stage** (build frontend + build backend + runtime Node Slim con **Nginx** reverse proxy e **Supervisord**)
   * **docker-compose.yml** con volume persistente per SQLite (`takeaway.sqlite`)
   * Porta unificata `8080` (con reverse proxy `/api` e `/health` su porta interna `3000`)
+  * Pipeline **GitHub Actions** per build multi-arch (`linux/amd64`, `linux/arm64`) e pubblicazione su GHCR
 
 ---
 
