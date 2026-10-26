@@ -25,7 +25,10 @@ import { TripsService } from './services/trips.service.js';
   imports: [
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
-      database: process.env.DB_PATH ?? '../takeaway.sqlite',
+      database:
+        process.env.NODE_ENV === 'test'
+          ? (process.env.TEST_DB_PATH ?? ':memory:')
+          : (process.env.DB_PATH ?? '../takeaway.sqlite'),
       entities: [User, Category, Item, CategoryItem, Trip, TripItemState],
       autoLoadEntities: process.env.DB_AUTO_LOAD_ENTITIES !== 'false',
       synchronize: process.env.DB_SYNCHRONIZE !== 'false',

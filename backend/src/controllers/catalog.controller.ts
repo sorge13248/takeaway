@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -26,6 +27,8 @@ import {
   UpdateItemDto,
 } from '../services/catalog.service.js';
 import { BearerJwtGuard } from '../common/auth/bearer-jwt.guard.js';
+import { CurrentUser } from '../common/auth/current-user.decorator.js';
+import type { AuthUser } from '../common/auth/auth.types.js';
 
 export interface UploadedFilePayload {
   fieldname: string;
@@ -95,64 +98,94 @@ export class CatalogController {
   // Catalog View
   // --------------------------------------------------------------------------
   @Get()
-  async getCatalog() {
-    return this.catalogService.getCatalog();
+  async getCatalog(@CurrentUser() user: AuthUser) {
+    return this.catalogService.getCatalog(user.id);
   }
 
   // --------------------------------------------------------------------------
   // Categories
   // --------------------------------------------------------------------------
   @Get('categories')
-  async getCategories() {
-    return this.catalogService.getCategoriesWithCounts();
+  async getCategories(@CurrentUser() user: AuthUser) {
+    return this.catalogService.getCategoriesWithCounts(user.id);
   }
 
   @Get('categories/:id')
-  async getCategory(@Param('id') id: string) {
-    return this.catalogService.getCategoryById(id);
+  async getCategory(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.catalogService.getCategoryById(user.id, id);
   }
 
   @Post('categories')
-  async createCategory(@Body() dto: CreateCategoryDto) {
-    return this.catalogService.createCategory(dto);
+  async createCategory(@CurrentUser() user: AuthUser, @Body() dto: CreateCategoryDto) {
+    return this.catalogService.createCategory(user.id, dto);
   }
 
   @Patch('categories/:id')
-  async updateCategory(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
-    return this.catalogService.updateCategory(id, dto);
+  async updateCategory(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateCategoryDto,
+  ) {
+    return this.catalogService.updateCategory(user.id, id, dto);
   }
 
   @Delete('categories/:id')
-  async deleteCategory(@Param('id') id: string) {
-    return this.catalogService.deleteCategory(id);
+  async deleteCategory(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.catalogService.deleteCategory(user.id, id);
+  }
+
+  @Put('categories/reorder')
+  async reorderCategories(
+    @CurrentUser() user: AuthUser,
+    @Body() body: { categoryIds: string[] },
+  ) {
+    return this.catalogService.reorderCategories(user.id, body.categoryIds);
+  }
+
+  @Put('categories/:categoryId/items/reorder')
+  async reorderCategoryItems(
+    @CurrentUser() user: AuthUser,
+    @Param('categoryId') categoryId: string,
+    @Body() body: { itemIds: string[]; sourceCategoryId?: string },
+  ) {
+    return this.catalogService.reorderCategoryItems(
+      user.id,
+      categoryId,
+      body.itemIds,
+      body.sourceCategoryId,
+    );
   }
 
   // --------------------------------------------------------------------------
   // Items
   // --------------------------------------------------------------------------
   @Get('items')
-  async getItems() {
-    return this.catalogService.getAllItemsDetailed();
+  async getItems(@CurrentUser() user: AuthUser) {
+    return this.catalogService.getAllItemsDetailed(user.id);
   }
 
   @Get('items/:id')
-  async getItem(@Param('id') id: string) {
-    return this.catalogService.getItemById(id);
+  async getItem(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.catalogService.getItemById(user.id, id);
   }
 
   @Post('items')
-  async createItem(@Body() dto: CreateItemDto) {
-    return this.catalogService.createItem(dto);
+  async createItem(@CurrentUser() user: AuthUser, @Body() dto: CreateItemDto) {
+    return this.catalogService.createItem(user.id, dto);
   }
 
   @Patch('items/:id')
-  async updateItem(@Param('id') id: string, @Body() dto: UpdateItemDto) {
-    return this.catalogService.updateItem(id, dto);
+  async updateItem(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateItemDto,
+  ) {
+    return this.catalogService.updateItem(user.id, id, dto);
   }
 
   @Delete('items/:id')
-  async deleteItem(@Param('id') id: string) {
-    return this.catalogService.deleteItem(id);
+  async deleteItem(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.catalogService.deleteItem(user.id, id);
   }
 
   // --------------------------------------------------------------------------
@@ -166,7 +199,7 @@ export class CatalogController {
       fileFilter: imageFileFilter,
     }),
   )
-  uploadImage(@UploadedFile() file?: UploadedFilePayload) {
+  uploadImage(@CurrentUser() _user: AuthUser, @UploadedFile() file?: UploadedFilePayload) {
     if (!file) {
       throw new BadRequestException('Nessun file caricato o file non valido');
     }
@@ -182,12 +215,12 @@ export class CatalogController {
   // Import / Export
   // --------------------------------------------------------------------------
   @Get('export')
-  async exportCatalog() {
-    return this.catalogService.exportCatalog();
+  async exportCatalog(@CurrentUser() user: AuthUser) {
+    return this.catalogService.exportCatalog(user.id);
   }
 
   @Post('import')
-  async importCatalog(@Body() dto: ImportCatalogDto) {
-    return this.catalogService.importCatalog(dto);
+  async importCatalog(@CurrentUser() user: AuthUser, @Body() dto: ImportCatalogDto) {
+    return this.catalogService.importCatalog(user.id, dto);
   }
 }

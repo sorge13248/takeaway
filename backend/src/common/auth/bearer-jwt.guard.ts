@@ -85,12 +85,13 @@ export class BearerJwtGuard implements CanActivate {
       throw new UnauthorizedException('Missing authentication token');
     }
 
-    if (token === 'mock-token' && mockEnabled) {
+    if (mockEnabled && (token === 'mock-token' || token.startsWith('mock-token:'))) {
+      const suffix = token.startsWith('mock-token:') ? token.slice('mock-token:'.length).trim() : 'mock-local-user';
       const mockAuthUser: AuthUser = {
-        id: '00000000-0000-0000-0000-000000000001',
-        subject: 'mock-local-user',
-        email: 'local@takeaway.local',
-        displayName: 'Utente Locale',
+        id: randomUUID(),
+        subject: suffix,
+        email: `${suffix}@takeaway.local`,
+        displayName: suffix === 'mock-local-user' ? 'Utente Locale' : `Mock ${suffix}`,
         pictureUrl: null,
       };
       const persisted = await this.usersService.ensureUser(mockAuthUser);

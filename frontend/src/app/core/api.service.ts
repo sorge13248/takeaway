@@ -68,6 +68,21 @@ export class ApiService {
     return this.http.delete<{ deleted: boolean; id: string }>(`${this.baseUrl}/catalog/categories/${id}`);
   }
 
+  reorderCategories(categoryIds: string[]): Observable<{ success: boolean }> {
+    return this.http.put<{ success: boolean }>(`${this.baseUrl}/catalog/categories/reorder`, { categoryIds });
+  }
+
+  reorderCategoryItems(
+    categoryId: string,
+    itemIds: string[],
+    sourceCategoryId?: string,
+  ): Observable<{ success: boolean }> {
+    return this.http.put<{ success: boolean }>(`${this.baseUrl}/catalog/categories/${categoryId}/items/reorder`, {
+      itemIds,
+      sourceCategoryId,
+    });
+  }
+
   // --------------------------------------------------------------------------
   // Items (Domain Management)
   // --------------------------------------------------------------------------

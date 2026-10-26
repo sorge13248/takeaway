@@ -3,18 +3,23 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
+import {
+  CdkDragDrop,
+  DragDropModule,
+  moveItemInArray,
+  transferArrayItem,
+} from '@angular/cdk/drag-drop';
 import { ApiService } from '../../core/api.service';
 import {
   CatalogCategory,
-  CatalogExportData,
   CatalogItem,
-  CategoryWithCount,
   CreateCategoryDto,
   CreateItemDto,
 } from '../../core/models';
-import { ConfirmModalComponent, ConfirmModalData } from '../../shared/components/confirm-modal/confirm-modal.component';
-
-export type DomainTab = 'categories' | 'items' | 'backup';
+import {
+  ConfirmModalComponent,
+  ConfirmModalData,
+} from '../../shared/components/confirm-modal/confirm-modal.component';
 
 export interface IconPreset {
   key: string;
@@ -48,9 +53,9 @@ export const ICON_PRESETS: IconPreset[] = [
 ];
 
 export const TAG_OPTIONS = [
-  { key: 'estate', label: 'Estate', emoji: '☀️', class: 'tag-summer' },
-  { key: 'inverno', label: 'Inverno', emoji: '❄️', class: 'tag-winter' },
-  { key: 'sera', label: 'Sera', emoji: '🌙', class: 'tag-night' },
+  { key: 'estate', label: 'Estate/caldo', emoji: '☀️', class: 'tag-summer' },
+  { key: 'inverno', label: 'Inverno/freddo', emoji: '❄️', class: 'tag-winter' },
+  { key: 'sera', label: 'Sera/notte', emoji: '🌙', class: 'tag-night' },
   { key: 'aereo', label: 'Aereo', emoji: '✈️', class: 'tag-flight' },
   { key: 'treno', label: 'Treno', emoji: '🚆', class: 'tag-train' },
   { key: 'traghetto', label: 'Traghetto', emoji: '🚢', class: 'tag-ferry' },
@@ -59,7 +64,7 @@ export const TAG_OPTIONS = [
 @Component({
   selector: 'app-domain-manager',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink, DragDropModule],
   templateUrl: './domain-manager.component.html',
   styleUrl: './domain-manager.component.scss',
 })
@@ -67,31 +72,36 @@ export class DomainManagerComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly dialog = inject(Dialog);
 
-  // Active Tab
-  readonly activeTab = signal<DomainTab>('categories');
-
-  // Data Signals
-  readonly categories = signal<CategoryWithCount[]>([]);
-  readonly items = signal<CatalogItem[]>([]);
-  readonly loading = signal<boolean>(false);
+  // Data signals
+  readonly catalog = signal<CatalogCategory[]>([]);
+  readonly loading = signal<boolean>(true);
   readonly saving = signal<boolean>(false);
   readonly errorMessage = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
 
-  // Filters: Categories Tab
-  readonly categorySearch = signal<string>('');
+  // Collapsed state: all sections collapsed by default in domain manager
+  readonly collapsedCategories = signal<Record<string, boolean>>({});
 
-  // Filters: Items Tab
-  readonly itemSearch = signal<string>('');
-  readonly itemCategoryFilter = signal<string>('all');
-  readonly itemTagFilter = signal<string>('all');
+  // Fast Filters (matching trip-detail)
+  readonly searchQuery = signal<string>('');
+  readonly categoryFilter = signal<string>('all');
+  readonly tagFilter = signal<string>('all');
+  readonly attributeFilter = signal<string>('all');
 
   // Modals visibility
   readonly showCategoryModal = signal<boolean>(false);
   readonly isEditingCategory = signal<boolean>(false);
   readonly showItemModal = signal<boolean>(false);
   readonly isEditingItem = signal<boolean>(false);
+  readonly showImportModal = signal<boolean>(false);
   readonly isModalClosing = signal<boolean>(false);
+
+  // Lightbox Preview
+  readonly lightboxImage = signal<{ url: string; title: string } | null>(null);
+
+  // Presets
+  readonly iconPresets = ICON_PRESETS;
+  readonly tagOptions = TAG_OPTIONS;
 
   // Category Form
   categoryForm: {
@@ -105,7 +115,7 @@ export class DomainManagerComponent implements OnInit {
     name: '',
     slug: '',
     parentGroup: '',
-    icon: 'list',
+    icon: 'sparkles',
     sortOrder: 0,
   };
   slugManuallyEdited = false;
@@ -147,62 +157,78 @@ export class DomainManagerComponent implements OnInit {
   readonly importing = signal<boolean>(false);
   readonly importError = signal<string | null>(null);
 
-  // Lightbox Preview
-  readonly lightboxImage = signal<{ url: string; title: string } | null>(null);
-
-  // Presets
-  readonly iconPresets = ICON_PRESETS;
-  readonly tagOptions = TAG_OPTIONS;
-
   // --------------------------------------------------------------------------
   // Computed Signals
   // --------------------------------------------------------------------------
-  readonly filteredCategories = computed(() => {
-    const search = this.categorySearch().trim().toLowerCase();
-    const list = this.categories();
-    if (!search) return list;
+  readonly totalCategoriesCount = computed(() => this.catalog().length);
 
-    return list.filter(
-      (c) =>
-        c.name.toLowerCase().includes(search) ||
-        c.slug.toLowerCase().includes(search) ||
-        (c.parentGroup && c.parentGroup.toLowerCase().includes(search)),
+  readonly totalItemsCount = computed(() =>
+    this.catalog().reduce((acc, cat) => acc + (cat.items?.length || 0), 0),
+  );
+
+  readonly isFiltered = computed(() => {
+    return (
+      this.searchQuery().trim() !== '' ||
+      this.categoryFilter() !== 'all' ||
+      this.tagFilter() !== 'all' ||
+      this.attributeFilter() !== 'all'
     );
   });
 
-  readonly filteredItems = computed(() => {
-    const search = this.itemSearch().trim().toLowerCase();
-    const catFilter = this.itemCategoryFilter();
-    const tagFilter = this.itemTagFilter();
-    const list = this.items();
+  readonly connectedDropLists = computed(() =>
+    this.catalog().map((cat) => 'items-list-' + cat.id),
+  );
 
-    return list.filter((item) => {
-      // Search text
-      if (search) {
-        const nameMatch = item.name.toLowerCase().includes(search);
-        const descMatch = item.description?.toLowerCase().includes(search);
-        if (!nameMatch && !descMatch) return false;
-      }
+  readonly filteredCatalog = computed(() => {
+    const query = this.searchQuery().trim().toLowerCase();
+    const catF = this.categoryFilter();
+    const tagF = this.tagFilter();
+    const attrF = this.attributeFilter();
 
-      // Category filter
-      if (catFilter !== 'all') {
-        const inCat = item.categoryIds?.includes(catFilter);
-        if (!inCat) return false;
-      }
+    return this.catalog()
+      .filter((cat) => catF === 'all' || cat.slug === catF)
+      .map((cat) => {
+        const filteredItems = (cat.items || []).filter((item) => {
+          if (query) {
+            const nameMatch = item.name.toLowerCase().includes(query);
+            const descMatch = item.description?.toLowerCase().includes(query);
+            const tagMatch = item.tags.some((t) => t.toLowerCase().includes(query));
+            const catMatch = cat.name.toLowerCase().includes(query);
+            if (!nameMatch && !descMatch && !tagMatch && !catMatch) return false;
+          }
 
-      // Tag filter
-      if (tagFilter !== 'all') {
-        const hasTag = item.tags.includes(tagFilter);
-        if (!hasTag) return false;
-      }
+          if (tagF !== 'all' && !item.tags.includes(tagF)) {
+            return false;
+          }
 
-      return true;
-    });
+          if (attrF === 'preparation' && !item.isPreparation) {
+            return false;
+          }
+          if (attrF === 'toBuy' && !item.toBuy) {
+            return false;
+          }
+          if (attrF === 'withPhoto' && !item.imageUrl) {
+            return false;
+          }
+
+          return true;
+        });
+
+        return {
+          ...cat,
+          filteredItems,
+        };
+      })
+      .filter(
+        (cat) =>
+          cat.filteredItems.length > 0 ||
+          (query === '' && tagF === 'all' && attrF === 'all'),
+      );
   });
 
   readonly parentGroups = computed(() => {
     const set = new Set<string>();
-    for (const c of this.categories()) {
+    for (const c of this.catalog()) {
       if (c.parentGroup?.trim()) {
         set.add(c.parentGroup.trim());
       }
@@ -214,39 +240,163 @@ export class DomainManagerComponent implements OnInit {
   // Lifecycle
   // --------------------------------------------------------------------------
   ngOnInit(): void {
-    this.loadAll();
+    this.loadCatalog();
   }
 
-  loadAll(): void {
+  loadCatalog(): void {
     this.loading.set(true);
     this.errorMessage.set(null);
 
-    this.api.getCategories().subscribe({
-      next: (cats) => {
-        this.categories.set(cats);
-        this.api.getItems().subscribe({
-          next: (items) => {
-            this.items.set(items);
-            this.loading.set(false);
-          },
-          error: (err) => {
-            this.errorMessage.set('Impossibile caricare gli oggetti del catalogo');
-            this.loading.set(false);
-          },
-        });
+    this.api.getCatalog().subscribe({
+      next: (data) => {
+        this.catalog.set(data);
+
+        // Sections must be collapsed by default in domain manager
+        const currentCollapsed = { ...this.collapsedCategories() };
+        const newCollapsed: Record<string, boolean> = {};
+        for (const cat of data) {
+          newCollapsed[cat.slug] = currentCollapsed[cat.slug] ?? true;
+        }
+        this.collapsedCategories.set(newCollapsed);
+        this.loading.set(false);
       },
-      error: (err) => {
-        this.errorMessage.set('Impossibile caricare le sezioni del catalogo');
+      error: () => {
+        this.errorMessage.set('Impossibile caricare il catalogo');
         this.loading.set(false);
       },
     });
   }
 
   // --------------------------------------------------------------------------
+  // Collapse / Expand Controls
+  // --------------------------------------------------------------------------
+  isCategoryCollapsed(slug: string): boolean {
+    if (this.searchQuery().trim()) {
+      return false; // auto-expand to show search results
+    }
+    return this.collapsedCategories()[slug] ?? true;
+  }
+
+  toggleCategory(slug: string): void {
+    const current = this.isCategoryCollapsed(slug);
+    this.collapsedCategories.update((prev) => ({
+      ...prev,
+      [slug]: !current,
+    }));
+  }
+
+  expandAll(): void {
+    const map: Record<string, boolean> = {};
+    for (const cat of this.catalog()) {
+      map[cat.slug] = false;
+    }
+    this.collapsedCategories.set(map);
+  }
+
+  collapseAll(): void {
+    const map: Record<string, boolean> = {};
+    for (const cat of this.catalog()) {
+      map[cat.slug] = true;
+    }
+    this.collapsedCategories.set(map);
+  }
+
+  // --------------------------------------------------------------------------
+  // Drag & Drop
+  // --------------------------------------------------------------------------
+  onCategoryDrop(event: CdkDragDrop<CatalogCategory[]>): void {
+    if (event.previousIndex === event.currentIndex) return;
+
+    const list = [...this.catalog()];
+    moveItemInArray(list, event.previousIndex, event.currentIndex);
+    this.catalog.set(list);
+
+    const categoryIds = list.map((c) => c.id).filter((id) => id !== 'uncategorized');
+    this.api.reorderCategories(categoryIds).subscribe({
+      next: () => {
+        this.showToast('Ordine delle sezioni aggiornato!');
+      },
+      error: () => {
+        this.errorMessage.set('Errore nel salvataggio dell\'ordine delle sezioni');
+        this.loadCatalog();
+      },
+    });
+  }
+
+  onItemDrop(event: CdkDragDrop<CatalogItem[]>, targetCategory: CatalogCategory): void {
+    if (event.previousContainer === event.container) {
+      if (event.previousIndex === event.currentIndex) return;
+
+      const items = [...targetCategory.items];
+      moveItemInArray(items, event.previousIndex, event.currentIndex);
+      targetCategory.items = items;
+      this.catalog.set([...this.catalog()]);
+
+      const itemIds = items.map((i) => i.id);
+      this.api.reorderCategoryItems(targetCategory.id, itemIds).subscribe({
+        next: () => {
+          this.showToast('Ordine oggetti aggiornato!');
+        },
+        error: () => {
+          this.errorMessage.set('Errore nel salvataggio dell\'ordine degli oggetti');
+          this.loadCatalog();
+        },
+      });
+    } else {
+      const sourceCategoryId = event.item?.data?.categoryId;
+      const movedItem =
+        event.item?.data?.item || event.previousContainer?.data?.[event.previousIndex];
+
+      if (event.previousContainer?.data && event.container?.data) {
+        transferArrayItem(
+          event.previousContainer.data,
+          event.container.data,
+          event.previousIndex,
+          event.currentIndex,
+        );
+      }
+
+      if (movedItem) {
+        const currentCatIds = movedItem.categoryIds || [];
+        const updatedCatIds = currentCatIds.filter((id: string) => id !== sourceCategoryId);
+        if (!updatedCatIds.includes(targetCategory.id)) {
+          updatedCatIds.push(targetCategory.id);
+        }
+        movedItem.categoryIds = updatedCatIds;
+        if (event.item?.data) {
+          event.item.data.categoryId = targetCategory.id;
+        }
+      }
+
+      this.catalog.set([...this.catalog()]);
+
+      const targetItemIds = event.container?.data?.map((i) => i.id) || [];
+      this.api
+        .reorderCategoryItems(
+          targetCategory.id,
+          targetItemIds,
+          sourceCategoryId,
+        )
+        .subscribe({
+          next: () => {
+            this.showToast(
+              `"${movedItem.name}" spostato in "${targetCategory.name}"`,
+            );
+          },
+          error: () => {
+            this.errorMessage.set('Errore nello spostamento dell\'oggetto');
+            this.loadCatalog();
+          },
+        });
+    }
+  }
+
+  // --------------------------------------------------------------------------
   // Category Actions
   // --------------------------------------------------------------------------
   openCreateCategoryModal(): void {
-    const nextOrder = (this.categories().reduce((max, c) => Math.max(max, c.sortOrder), 0) || 0) + 1;
+    const nextOrder =
+      (this.catalog().reduce((max, c) => Math.max(max, c.sortOrder), 0) || 0) + 1;
     this.categoryForm = {
       name: '',
       slug: '',
@@ -260,13 +410,13 @@ export class DomainManagerComponent implements OnInit {
     this.showCategoryModal.set(true);
   }
 
-  openEditCategoryModal(cat: CategoryWithCount): void {
+  openEditCategoryModal(cat: CatalogCategory): void {
     this.categoryForm = {
       id: cat.id,
       name: cat.name,
       slug: cat.slug,
       parentGroup: cat.parentGroup || '',
-      icon: cat.icon || 'list',
+      icon: cat.icon || 'sparkles',
       sortOrder: cat.sortOrder,
     };
     this.slugManuallyEdited = true;
@@ -295,38 +445,75 @@ export class DomainManagerComponent implements OnInit {
     };
 
     if (this.isEditingCategory() && this.categoryForm.id) {
-      this.api.updateCategory(this.categoryForm.id, dto).subscribe({
-        next: () => {
+      const catId = this.categoryForm.id;
+      this.api.updateCategory(catId, dto).subscribe({
+        next: (updatedCat) => {
           this.saving.set(false);
           this.closeModals();
           this.showToast('Sezione aggiornata con successo!');
-          this.loadAll();
+
+          this.catalog.update((cats) =>
+            cats.map((c) => {
+              if (c.id === catId) {
+                return {
+                  ...c,
+                  name: updatedCat?.name ?? dto.name,
+                  slug: updatedCat?.slug ?? dto.slug ?? c.slug,
+                  parentGroup: updatedCat?.parentGroup ?? dto.parentGroup ?? null,
+                  icon: updatedCat?.icon ?? dto.icon ?? c.icon,
+                  sortOrder: updatedCat?.sortOrder ?? dto.sortOrder ?? c.sortOrder,
+                };
+              }
+              return c;
+            }),
+          );
         },
         error: (err) => {
           this.saving.set(false);
-          this.errorMessage.set(err?.error?.message || 'Errore nel salvataggio della sezione');
+          this.errorMessage.set(
+            err?.error?.message || 'Errore nel salvataggio della sezione',
+          );
         },
       });
     } else {
       this.api.createCategory(dto).subscribe({
-        next: () => {
+        next: (newCat) => {
           this.saving.set(false);
           this.closeModals();
           this.showToast('Nuova sezione creata con successo!');
-          this.loadAll();
+
+          const catToAdd: CatalogCategory = {
+            id: newCat.id,
+            slug: newCat.slug,
+            name: newCat.name,
+            parentGroup: newCat.parentGroup,
+            icon: newCat.icon,
+            sortOrder: newCat.sortOrder,
+            items: [],
+          };
+
+          this.catalog.update((cats) => [...cats, catToAdd]);
+          this.collapsedCategories.update((prev) => ({
+            ...prev,
+            [newCat.slug]: true,
+          }));
         },
         error: (err) => {
           this.saving.set(false);
-          this.errorMessage.set(err?.error?.message || 'Errore nella creazione della sezione');
+          this.errorMessage.set(
+            err?.error?.message || 'Errore nella creazione della sezione',
+          );
         },
       });
     }
   }
 
-  confirmDeleteCategory(cat: CategoryWithCount): void {
-    const warning = cat.itemsCount > 0
-      ? `Attenzione: questa sezione contiene ${cat.itemsCount} oggetti associati. L'eliminazione rimuoverà l'associazione.`
-      : '';
+  confirmDeleteCategory(cat: CatalogCategory): void {
+    const itemsCount = cat.items?.length || 0;
+    const warning =
+      itemsCount > 0
+        ? `Attenzione: questa sezione contiene ${itemsCount} oggetti associati.`
+        : '';
 
     const dialogRef = this.dialog.open<boolean>(ConfirmModalComponent, {
       data: {
@@ -343,9 +530,9 @@ export class DomainManagerComponent implements OnInit {
         this.api.deleteCategory(cat.id).subscribe({
           next: () => {
             this.showToast(`Sezione "${cat.name}" eliminata`);
-            this.loadAll();
+            this.catalog.update((cats) => cats.filter((c) => c.id !== cat.id));
           },
-          error: (err) => {
+          error: () => {
             this.errorMessage.set('Errore durante l\'eliminazione della sezione');
           },
         });
@@ -357,7 +544,11 @@ export class DomainManagerComponent implements OnInit {
   // Item Actions
   // --------------------------------------------------------------------------
   openCreateItemModal(): void {
-    const nextOrder = (this.items().reduce((max, i) => Math.max(max, i.sortOrder), 0) || 0) + 1;
+    const preselectedCatId =
+      this.categoryFilter() !== 'all'
+        ? this.catalog().find((c) => c.slug === this.categoryFilter())?.id
+        : this.catalog()[0]?.id;
+
     this.itemForm = {
       name: '',
       description: '',
@@ -367,8 +558,27 @@ export class DomainManagerComponent implements OnInit {
       minDays: null,
       toBuy: false,
       imageUrl: '',
-      sortOrder: nextOrder,
-      categoryIds: this.itemCategoryFilter() !== 'all' ? [this.itemCategoryFilter()] : [],
+      sortOrder: 0,
+      categoryIds: preselectedCatId ? [preselectedCatId] : [],
+    };
+    this.uploadError.set(null);
+    this.isEditingItem.set(false);
+    this.isModalClosing.set(false);
+    this.showItemModal.set(true);
+  }
+
+  openCreateItemModalForCategory(category: CatalogCategory): void {
+    this.itemForm = {
+      name: '',
+      description: '',
+      tags: [],
+      defaultQuantity: 1,
+      isPreparation: false,
+      minDays: null,
+      toBuy: false,
+      imageUrl: '',
+      sortOrder: (category.items?.length || 0) + 1,
+      categoryIds: [category.id],
     };
     this.uploadError.set(null);
     this.isEditingItem.set(false);
@@ -377,6 +587,14 @@ export class DomainManagerComponent implements OnInit {
   }
 
   openEditItemModal(item: CatalogItem): void {
+    // If categoryIds is missing or empty, find which categories contain this item
+    let catIds = item.categoryIds || [];
+    if (catIds.length === 0) {
+      catIds = this.catalog()
+        .filter((c) => c.items?.some((i) => i.id === item.id))
+        .map((c) => c.id);
+    }
+
     this.itemForm = {
       id: item.id,
       name: item.name,
@@ -388,7 +606,7 @@ export class DomainManagerComponent implements OnInit {
       toBuy: item.toBuy,
       imageUrl: item.imageUrl || '',
       sortOrder: item.sortOrder,
-      categoryIds: [...(item.categoryIds || [])],
+      categoryIds: [...catIds],
     };
     this.uploadError.set(null);
     this.isEditingItem.set(true);
@@ -430,7 +648,9 @@ export class DomainManagerComponent implements OnInit {
       },
       error: (err) => {
         this.uploadingImage.set(false);
-        this.uploadError.set(err?.error?.message || 'Errore nel caricamento dell\'immagine');
+        this.uploadError.set(
+          err?.error?.message || 'Errore nel caricamento dell\'immagine',
+        );
       },
     });
   }
@@ -451,7 +671,10 @@ export class DomainManagerComponent implements OnInit {
       tags: this.itemForm.tags,
       defaultQuantity: Number(this.itemForm.defaultQuantity) || 1,
       isPreparation: this.itemForm.isPreparation,
-      minDays: this.itemForm.minDays && this.itemForm.minDays > 0 ? Number(this.itemForm.minDays) : null,
+      minDays:
+        this.itemForm.minDays && this.itemForm.minDays > 0
+          ? Number(this.itemForm.minDays)
+          : null,
       toBuy: this.itemForm.toBuy,
       imageUrl: this.itemForm.imageUrl.trim() || null,
       sortOrder: Number(this.itemForm.sortOrder) || 0,
@@ -459,29 +682,141 @@ export class DomainManagerComponent implements OnInit {
     };
 
     if (this.isEditingItem() && this.itemForm.id) {
-      this.api.updateItem(this.itemForm.id, dto).subscribe({
-        next: () => {
+      const itemId = this.itemForm.id;
+      this.api.updateItem(itemId, dto).subscribe({
+        next: (updatedItem) => {
           this.saving.set(false);
           this.closeModals();
           this.showToast('Oggetto aggiornato con successo!');
-          this.loadAll();
+
+          const targetCategoryIds =
+            updatedItem?.categoryIds || dto.categoryIds || [];
+
+          this.catalog.update((cats) =>
+            cats.map((cat) => {
+              const shouldBeInCat = targetCategoryIds.includes(cat.id);
+              const isCurrentlyInCat = (cat.items || []).some((i) => i.id === itemId);
+
+              if (shouldBeInCat && isCurrentlyInCat) {
+                return {
+                  ...cat,
+                  items: cat.items.map((i) =>
+                    i.id === itemId
+                      ? {
+                          ...i,
+                          name: updatedItem?.name ?? dto.name,
+                          description:
+                            updatedItem?.description !== undefined
+                              ? updatedItem.description
+                              : (dto.description ?? null),
+                          tags: Array.isArray(updatedItem?.tags)
+                            ? updatedItem.tags
+                            : (Array.isArray(dto.tags) ? dto.tags : i.tags),
+                          defaultQuantity:
+                            updatedItem?.defaultQuantity ?? dto.defaultQuantity ?? 1,
+                          isPreparation:
+                            updatedItem?.isPreparation ?? Boolean(dto.isPreparation),
+                          minDays:
+                            updatedItem?.minDays !== undefined
+                              ? updatedItem.minDays
+                              : (dto.minDays ?? null),
+                          toBuy: updatedItem?.toBuy ?? Boolean(dto.toBuy),
+                          imageUrl:
+                            updatedItem?.imageUrl !== undefined
+                              ? updatedItem.imageUrl
+                              : (dto.imageUrl ?? null),
+                          sortOrder:
+                            updatedItem?.sortOrder ?? dto.sortOrder ?? i.sortOrder,
+                          categoryIds: targetCategoryIds,
+                        }
+                      : i,
+                  ),
+                };
+              } else if (shouldBeInCat && !isCurrentlyInCat) {
+                const itemToAdd: CatalogItem = {
+                  id: itemId,
+                  name: updatedItem?.name ?? dto.name,
+                  description: updatedItem?.description ?? dto.description ?? null,
+                  tags: Array.isArray(updatedItem?.tags)
+                    ? updatedItem.tags
+                    : (Array.isArray(dto.tags) ? dto.tags : []),
+                  defaultQuantity:
+                    updatedItem?.defaultQuantity ?? dto.defaultQuantity ?? 1,
+                  isPreparation:
+                    updatedItem?.isPreparation ?? Boolean(dto.isPreparation),
+                  minDays: updatedItem?.minDays ?? dto.minDays ?? null,
+                  toBuy: updatedItem?.toBuy ?? Boolean(dto.toBuy),
+                  imageUrl: updatedItem?.imageUrl ?? dto.imageUrl ?? null,
+                  sortOrder:
+                    updatedItem?.sortOrder ?? dto.sortOrder ?? (cat.items?.length || 0) + 1,
+                  categoryIds: targetCategoryIds,
+                };
+                return {
+                  ...cat,
+                  items: [...(cat.items || []), itemToAdd],
+                };
+              } else if (!shouldBeInCat && isCurrentlyInCat) {
+                return {
+                  ...cat,
+                  items: (cat.items || []).filter((i) => i.id !== itemId),
+                };
+              }
+              return cat;
+            }),
+          );
         },
         error: (err) => {
           this.saving.set(false);
-          this.errorMessage.set(err?.error?.message || 'Errore nel salvataggio dell\'oggetto');
+          this.errorMessage.set(
+            err?.error?.message || 'Errore nel salvataggio dell\'oggetto',
+          );
         },
       });
     } else {
       this.api.createItem(dto).subscribe({
-        next: () => {
+        next: (createdItem) => {
           this.saving.set(false);
           this.closeModals();
           this.showToast('Nuovo oggetto creato con successo!');
-          this.loadAll();
+
+          const targetCategoryIds =
+            createdItem?.categoryIds || dto.categoryIds || [];
+
+          const itemToAdd: CatalogItem = {
+            id: createdItem?.id || 'item-' + Date.now(),
+            name: createdItem?.name ?? dto.name,
+            description: createdItem?.description ?? dto.description ?? null,
+            tags: Array.isArray(createdItem?.tags)
+              ? createdItem.tags
+              : (Array.isArray(dto.tags) ? dto.tags : []),
+            defaultQuantity:
+              createdItem?.defaultQuantity ?? dto.defaultQuantity ?? 1,
+            isPreparation:
+              createdItem?.isPreparation ?? Boolean(dto.isPreparation),
+            minDays: createdItem?.minDays ?? dto.minDays ?? null,
+            toBuy: createdItem?.toBuy ?? Boolean(dto.toBuy),
+            imageUrl: createdItem?.imageUrl ?? dto.imageUrl ?? null,
+            sortOrder: createdItem?.sortOrder ?? dto.sortOrder ?? 0,
+            categoryIds: targetCategoryIds,
+          };
+
+          this.catalog.update((cats) =>
+            cats.map((cat) => {
+              if (targetCategoryIds.includes(cat.id)) {
+                return {
+                  ...cat,
+                  items: [...(cat.items || []), itemToAdd],
+                };
+              }
+              return cat;
+            }),
+          );
         },
         error: (err) => {
           this.saving.set(false);
-          this.errorMessage.set(err?.error?.message || 'Errore nella creazione dell\'oggetto');
+          this.errorMessage.set(
+            err?.error?.message || 'Errore nella creazione dell\'oggetto',
+          );
         },
       });
     }
@@ -503,9 +838,14 @@ export class DomainManagerComponent implements OnInit {
         this.api.deleteItem(item.id).subscribe({
           next: () => {
             this.showToast(`Oggetto "${item.name}" eliminato`);
-            this.loadAll();
+            this.catalog.update((cats) =>
+              cats.map((cat) => ({
+                ...cat,
+                items: (cat.items || []).filter((i) => i.id !== item.id),
+              })),
+            );
           },
-          error: (err) => {
+          error: () => {
             this.errorMessage.set('Errore durante l\'eliminazione dell\'oggetto');
           },
         });
@@ -536,6 +876,15 @@ export class DomainManagerComponent implements OnInit {
     });
   }
 
+  openImportModal(): void {
+    this.importFile = null;
+    this.importPreview = null;
+    this.importError.set(null);
+    this.importMode = 'merge';
+    this.isModalClosing.set(false);
+    this.showImportModal.set(true);
+  }
+
   onImportFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (!input.files || input.files.length === 0) return;
@@ -548,8 +897,14 @@ export class DomainManagerComponent implements OnInit {
     reader.onload = (e) => {
       try {
         const json = JSON.parse(e.target?.result as string);
-        if (!json || !Array.isArray(json.categories) || !Array.isArray(json.items)) {
-          this.importError.set('File JSON non valido. Deve contenere array "categories" e "items".');
+        if (
+          !json ||
+          !Array.isArray(json.categories) ||
+          !Array.isArray(json.items)
+        ) {
+          this.importError.set(
+            'File JSON non valido. Deve contenere array "categories" e "items".',
+          );
           this.importFile = null;
           return;
         }
@@ -557,8 +912,10 @@ export class DomainManagerComponent implements OnInit {
           categoriesCount: json.categories.length,
           itemsCount: json.items.length,
         };
-      } catch (err) {
-        this.importError.set('Impossibile interpretare il file JSON. Assicurati che sia formattato correttamente.');
+      } catch {
+        this.importError.set(
+          'Impossibile interpretare il file JSON. Assicurati che sia formattato correttamente.',
+        );
         this.importFile = null;
       }
     };
@@ -584,19 +941,20 @@ export class DomainManagerComponent implements OnInit {
           .subscribe({
             next: (res) => {
               this.importing.set(false);
-              this.importFile = null;
-              this.importPreview = null;
+              this.showImportModal.set(false);
               this.showToast(
                 `Importazione completata con successo! (${res.importedCategories} sezioni, ${res.importedItems} oggetti)`,
               );
-              this.loadAll();
+              this.loadCatalog();
             },
             error: (err) => {
               this.importing.set(false);
-              this.importError.set(err?.error?.message || 'Errore durante l\'importazione');
+              this.importError.set(
+                err?.error?.message || 'Errore durante l\'importazione',
+              );
             },
           });
-      } catch (err) {
+      } catch {
         this.importing.set(false);
         this.importError.set('Errore di lettura del file');
       }
@@ -620,6 +978,7 @@ export class DomainManagerComponent implements OnInit {
     setTimeout(() => {
       this.showCategoryModal.set(false);
       this.showItemModal.set(false);
+      this.showImportModal.set(false);
       this.isModalClosing.set(false);
     }, 180);
   }
@@ -657,4 +1016,3 @@ export class DomainManagerComponent implements OnInit {
     );
   }
 }
-

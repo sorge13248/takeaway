@@ -97,8 +97,9 @@ export class CatalogService {
   // --------------------------------------------------------------------------
   // Catalog View (Categories + Sorted Items)
   // --------------------------------------------------------------------------
-  async getCatalog() {
+  async getCatalog(userId: string) {
     const categories = await this.dataSource.getRepository(Category).find({
+      where: { userId },
       order: { sortOrder: 'ASC' },
       relations: {
         categoryItems: {
@@ -107,10 +108,20 @@ export class CatalogService {
       },
     });
 
+    const catItems = await this.dataSource.getRepository(CategoryItem).find({
+      where: { userId },
+    });
+    const itemCatMap = new Map<string, string[]>();
+    for (const ci of catItems) {
+      const list = itemCatMap.get(ci.itemId) || [];
+      list.push(ci.categoryId);
+      itemCatMap.set(ci.itemId, list);
+    }
+
     return categories.map((cat) => {
       const sortedItems = [...(cat.categoryItems || [])]
         .sort((a, b) => a.sortOrder - b.sortOrder)
-        .filter((ci) => ci.item != null)
+        .filter((ci) => ci.item != null && ci.item.userId === userId)
         .map((ci) => ci.item);
 
       return {
@@ -123,6 +134,7 @@ export class CatalogService {
         items: sortedItems.map((item) => ({
           ...item,
           tags: this.parseTags(item.tags),
+          categoryIds: itemCatMap.get(item.id) || [cat.id],
         })),
       };
     });
@@ -131,8 +143,9 @@ export class CatalogService {
   // --------------------------------------------------------------------------
   // Categories CRUD
   // --------------------------------------------------------------------------
-  async getCategoriesWithCounts() {
+  async getCategoriesWithCounts(userId: string) {
     const categories = await this.dataSource.getRepository(Category).find({
+      where: { userId },
       order: { sortOrder: 'ASC', name: 'ASC' },
       relations: {
         categoryItems: true,
@@ -152,9 +165,9 @@ export class CatalogService {
     }));
   }
 
-  async getCategoryById(id: string): Promise<Category> {
+  async getCategoryById(userId: string, id: string): Promise<Category> {
     const category = await this.dataSource.getRepository(Category).findOne({
-      where: { id },
+      where: { id, userId },
       relations: { categoryItems: { item: true } },
     });
     if (!category) {
@@ -163,7 +176,7 @@ export class CatalogService {
     return category;
   }
 
-  async createCategory(dto: CreateCategoryDto): Promise<Category> {
+  async createCategory(userId: string, dto: CreateCategoryDto): Promise<Category> {
     const categoryRepo = this.dataSource.getRepository(Category);
 
     const name = dto.name?.trim();
@@ -172,10 +185,10 @@ export class CatalogService {
     }
 
     let slug = dto.slug ? slugify(dto.slug) : slugify(name);
-    // Ensure slug uniqueness
+    // Ensure slug uniqueness per user
     let counter = 1;
-    let baseSlug = slug;
-    while (await categoryRepo.findOne({ where: { slug } })) {
+    const baseSlug = slug;
+    while (await categoryRepo.findOne({ where: { userId, slug } })) {
       slug = `${baseSlug}-${counter++}`;
     }
 
@@ -183,12 +196,14 @@ export class CatalogService {
     if (sortOrder === undefined || sortOrder === null) {
       const maxOrder = await categoryRepo
         .createQueryBuilder('cat')
+        .where('cat.userId = :userId', { userId })
         .select('MAX(cat.sortOrder)', 'max')
         .getRawOne();
       sortOrder = (maxOrder?.max ?? 0) + 1;
     }
 
     const category = categoryRepo.create({
+      userId,
       name,
       slug,
       parentGroup: dto.parentGroup?.trim() || null,
@@ -199,9 +214,9 @@ export class CatalogService {
     return categoryRepo.save(category);
   }
 
-  async updateCategory(id: string, dto: UpdateCategoryDto): Promise<Category> {
+  async updateCategory(userId: string, id: string, dto: UpdateCategoryDto): Promise<Category> {
     const categoryRepo = this.dataSource.getRepository(Category);
-    const category = await categoryRepo.findOne({ where: { id } });
+    const category = await categoryRepo.findOne({ where: { id, userId } });
     if (!category) {
       throw new NotFoundException(`Categoria con ID ${id} non trovata`);
     }
@@ -217,7 +232,7 @@ export class CatalogService {
     if (dto.slug !== undefined && dto.slug.trim()) {
       const newSlug = slugify(dto.slug);
       if (newSlug !== category.slug) {
-        const existing = await categoryRepo.findOne({ where: { slug: newSlug } });
+        const existing = await categoryRepo.findOne({ where: { userId, slug: newSlug } });
         if (existing && existing.id !== id) {
           throw new BadRequestException(`Lo slug "${newSlug}" è già utilizzato da un'altra categoria`);
         }
@@ -240,9 +255,9 @@ export class CatalogService {
     return categoryRepo.save(category);
   }
 
-  async deleteCategory(id: string): Promise<{ deleted: boolean; id: string }> {
+  async deleteCategory(userId: string, id: string): Promise<{ deleted: boolean; id: string }> {
     const categoryRepo = this.dataSource.getRepository(Category);
-    const category = await categoryRepo.findOne({ where: { id } });
+    const category = await categoryRepo.findOne({ where: { id, userId } });
     if (!category) {
       throw new NotFoundException(`Categoria con ID ${id} non trovata`);
     }
@@ -251,12 +266,81 @@ export class CatalogService {
     return { deleted: true, id };
   }
 
+  async reorderCategories(userId: string, categoryIds: string[]): Promise<{ success: boolean }> {
+    if (!Array.isArray(categoryIds)) {
+      throw new BadRequestException('categoryIds deve essere un array');
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      const categoryRepo = manager.getRepository(Category);
+      for (let i = 0; i < categoryIds.length; i++) {
+        const id = categoryIds[i];
+        if (id && id !== 'uncategorized') {
+          await categoryRepo.update({ id, userId }, { sortOrder: i + 1 });
+        }
+      }
+    });
+
+    return { success: true };
+  }
+
+  async reorderCategoryItems(
+    userId: string,
+    categoryId: string,
+    itemIds: string[],
+    sourceCategoryId?: string,
+  ): Promise<{ success: boolean }> {
+    if (!Array.isArray(itemIds)) {
+      throw new BadRequestException('itemIds deve essere un array');
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      const catItemRepo = manager.getRepository(CategoryItem);
+
+      if (sourceCategoryId && sourceCategoryId !== categoryId && sourceCategoryId !== 'uncategorized') {
+        for (const itemId of itemIds) {
+          const inSource = await catItemRepo.findOne({
+            where: { userId, categoryId: sourceCategoryId, itemId },
+          });
+          if (inSource) {
+            await catItemRepo.delete({ userId, categoryId: sourceCategoryId, itemId });
+          }
+        }
+      }
+
+      if (categoryId !== 'uncategorized') {
+        for (let i = 0; i < itemIds.length; i++) {
+          const itemId = itemIds[i];
+          const existing = await catItemRepo.findOne({
+            where: { userId, categoryId, itemId },
+          });
+
+          if (existing) {
+            existing.sortOrder = i + 1;
+            await catItemRepo.save(existing);
+          } else {
+            const created = catItemRepo.create({
+              userId,
+              categoryId,
+              itemId,
+              sortOrder: i + 1,
+            });
+            await catItemRepo.save(created);
+          }
+        }
+      }
+    });
+
+    return { success: true };
+  }
+
   // --------------------------------------------------------------------------
   // Items CRUD
   // --------------------------------------------------------------------------
-  async getAllItemsDetailed() {
+  async getAllItemsDetailed(userId: string) {
     const itemRepo = this.dataSource.getRepository(Item);
     const items = await itemRepo.find({
+      where: { userId },
       order: { sortOrder: 'ASC', name: 'ASC' },
       relations: {
         categoryItems: {
@@ -280,21 +364,24 @@ export class CatalogService {
       updatedAt: item.updatedAt,
       categories: (item.categoryItems || [])
         .map((ci) => ci.category)
-        .filter(Boolean)
+        .filter((c): c is Category => c != null && c.userId === userId)
         .map((c) => ({ id: c.id, slug: c.slug, name: c.name, icon: c.icon })),
-      categoryIds: (item.categoryItems || []).map((ci) => ci.categoryId),
+      categoryIds: (item.categoryItems || [])
+        .filter((ci) => ci.category == null || ci.category.userId === userId)
+        .map((ci) => ci.categoryId),
     }));
   }
 
-  async getAllItems(): Promise<Item[]> {
+  async getAllItems(userId: string): Promise<Item[]> {
     return this.dataSource.getRepository(Item).find({
+      where: { userId },
       order: { sortOrder: 'ASC' },
     });
   }
 
-  async getItemById(id: string) {
+  async getItemById(userId: string, id: string) {
     const item = await this.dataSource.getRepository(Item).findOne({
-      where: { id },
+      where: { id, userId },
       relations: {
         categoryItems: {
           category: true,
@@ -321,13 +408,15 @@ export class CatalogService {
       updatedAt: item.updatedAt,
       categories: (item.categoryItems || [])
         .map((ci) => ci.category)
-        .filter(Boolean)
+        .filter((c): c is Category => c != null && c.userId === userId)
         .map((c) => ({ id: c.id, slug: c.slug, name: c.name, icon: c.icon })),
-      categoryIds: (item.categoryItems || []).map((ci) => ci.categoryId),
+      categoryIds: (item.categoryItems || [])
+        .filter((ci) => ci.category == null || ci.category.userId === userId)
+        .map((ci) => ci.categoryId),
     };
   }
 
-  async createItem(dto: CreateItemDto) {
+  async createItem(userId: string, dto: CreateItemDto) {
     const name = dto.name?.trim();
     if (!name) {
       throw new BadRequestException("Il nome dell'oggetto è obbligatorio");
@@ -340,6 +429,7 @@ export class CatalogService {
     if (sortOrder === undefined || sortOrder === null) {
       const maxOrder = await itemRepo
         .createQueryBuilder('it')
+        .where('it.userId = :userId', { userId })
         .select('MAX(it.sortOrder)', 'max')
         .getRawOne();
       sortOrder = (maxOrder?.max ?? 0) + 1;
@@ -352,6 +442,7 @@ export class CatalogService {
         : '[]';
 
     const item = itemRepo.create({
+      userId,
       name,
       description: dto.description?.trim() || null,
       tags: tagsString,
@@ -367,9 +458,10 @@ export class CatalogService {
 
     // Save category associations if provided
     if (Array.isArray(dto.categoryIds) && dto.categoryIds.length > 0) {
-      const validCategoryIds = await this.validateCategoryIds(dto.categoryIds);
+      const validCategoryIds = await this.validateCategoryIds(userId, dto.categoryIds);
       const junctions = validCategoryIds.map((catId, idx) =>
         catItemRepo.create({
+          userId,
           categoryId: catId,
           itemId: savedItem.id,
           sortOrder: idx + 1,
@@ -380,14 +472,14 @@ export class CatalogService {
       }
     }
 
-    return this.getItemById(savedItem.id);
+    return this.getItemById(userId, savedItem.id);
   }
 
-  async updateItem(id: string, dto: UpdateItemDto) {
+  async updateItem(userId: string, id: string, dto: UpdateItemDto) {
     const itemRepo = this.dataSource.getRepository(Item);
     const catItemRepo = this.dataSource.getRepository(CategoryItem);
 
-    const item = await itemRepo.findOne({ where: { id } });
+    const item = await itemRepo.findOne({ where: { id, userId } });
     if (!item) {
       throw new NotFoundException(`Oggetto con ID ${id} non trovato`);
     }
@@ -440,12 +532,13 @@ export class CatalogService {
 
     // Update categories if specified
     if (dto.categoryIds !== undefined) {
-      await catItemRepo.delete({ itemId: id });
+      await catItemRepo.delete({ itemId: id, userId });
 
       if (Array.isArray(dto.categoryIds) && dto.categoryIds.length > 0) {
-        const validCategoryIds = await this.validateCategoryIds(dto.categoryIds);
+        const validCategoryIds = await this.validateCategoryIds(userId, dto.categoryIds);
         const junctions = validCategoryIds.map((catId, idx) =>
           catItemRepo.create({
+            userId,
             categoryId: catId,
             itemId: id,
             sortOrder: idx + 1,
@@ -457,12 +550,12 @@ export class CatalogService {
       }
     }
 
-    return this.getItemById(id);
+    return this.getItemById(userId, id);
   }
 
-  async deleteItem(id: string): Promise<{ deleted: boolean; id: string }> {
+  async deleteItem(userId: string, id: string): Promise<{ deleted: boolean; id: string }> {
     const itemRepo = this.dataSource.getRepository(Item);
-    const item = await itemRepo.findOne({ where: { id } });
+    const item = await itemRepo.findOne({ where: { id, userId } });
     if (!item) {
       throw new NotFoundException(`Oggetto con ID ${id} non trovato`);
     }
@@ -474,12 +567,13 @@ export class CatalogService {
   // --------------------------------------------------------------------------
   // Export & Import Catalog
   // --------------------------------------------------------------------------
-  async exportCatalog() {
+  async exportCatalog(userId: string) {
     const categories = await this.dataSource.getRepository(Category).find({
+      where: { userId },
       order: { sortOrder: 'ASC' },
     });
 
-    const items = await this.getAllItemsDetailed();
+    const items = await this.getAllItemsDetailed(userId);
 
     return {
       version: 1,
@@ -509,7 +603,7 @@ export class CatalogService {
     };
   }
 
-  async importCatalog(payload: ImportCatalogDto) {
+  async importCatalog(userId: string, payload: ImportCatalogDto) {
     if (!payload || !Array.isArray(payload.categories) || !Array.isArray(payload.items)) {
       throw new BadRequestException('Formato file non valido. Devono essere presenti "categories" e "items".');
     }
@@ -522,9 +616,9 @@ export class CatalogService {
       const catItemRepo = manager.getRepository(CategoryItem);
 
       if (mode === 'replace') {
-        await manager.clear(CategoryItem);
-        await manager.clear(Item);
-        await manager.clear(Category);
+        await catItemRepo.delete({ userId });
+        await itemRepo.delete({ userId });
+        await categoryRepo.delete({ userId });
       }
 
       // Map from incoming slug/id to actual category entity
@@ -535,10 +629,11 @@ export class CatalogService {
         if (!catData.name?.trim()) continue;
 
         let slug = catData.slug ? slugify(catData.slug) : slugify(catData.name);
-        let existing = await categoryRepo.findOne({ where: { slug } });
+        let existing = await categoryRepo.findOne({ where: { userId, slug } });
 
         if (!existing) {
           existing = categoryRepo.create({
+            userId,
             slug,
             name: catData.name.trim(),
             parentGroup: catData.parentGroup?.trim() || null,
@@ -573,6 +668,7 @@ export class CatalogService {
             : '[]';
 
         const item = itemRepo.create({
+          userId,
           name: itemData.name.trim(),
           description: itemData.description?.trim() || null,
           tags: tagsString,
@@ -606,6 +702,7 @@ export class CatalogService {
         for (const catId of targetCategoryIds) {
           await catItemRepo.save(
             catItemRepo.create({
+              userId,
               categoryId: catId,
               itemId: savedItem.id,
               sortOrder: linkOrder++,
@@ -626,10 +723,10 @@ export class CatalogService {
   // --------------------------------------------------------------------------
   // Helpers
   // --------------------------------------------------------------------------
-  private async validateCategoryIds(categoryIds: string[]): Promise<string[]> {
+  private async validateCategoryIds(userId: string, categoryIds: string[]): Promise<string[]> {
     if (!categoryIds || categoryIds.length === 0) return [];
     const validCategories = await this.dataSource.getRepository(Category).find({
-      where: { id: In(categoryIds) },
+      where: { id: In(categoryIds), userId },
       select: { id: true },
     });
     return validCategories.map((c) => c.id);

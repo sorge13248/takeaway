@@ -1,10 +1,24 @@
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import type { CategoryItem } from './category-item.entity.js';
+import type { User } from './user.entity.js';
 
 @Entity({ name: 'items' })
+@Index(['userId'])
 export class Item {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
+
+  @Column({ type: 'varchar' })
+  userId!: string;
 
   @Column({ type: 'varchar' })
   name!: string;
@@ -33,6 +47,9 @@ export class Item {
   @Column({ type: 'integer', default: 0 })
   sortOrder!: number;
 
+  @ManyToOne('User', { onDelete: 'CASCADE' })
+  user?: User;
+
   @OneToMany('CategoryItem', 'item')
   categoryItems!: CategoryItem[];
 
@@ -42,4 +59,3 @@ export class Item {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

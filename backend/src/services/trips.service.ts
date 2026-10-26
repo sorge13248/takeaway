@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { Trip } from '../entities/trip.entity.js';
 import { TripItemState } from '../entities/trip-item-state.entity.js';
+import { Item } from '../entities/item.entity.js';
 
 export class CreateTripDto {
   title!: string;
@@ -155,6 +156,11 @@ export class TripsService {
     }
     if (trip.userId !== userId) {
       throw new ForbiddenException('Accesso negato al viaggio specificato');
+    }
+
+    const item = await this.dataSource.getRepository(Item).findOne({ where: { id: itemId, userId } });
+    if (!item) {
+      throw new NotFoundException(`Oggetto con ID ${itemId} non trovato`);
     }
 
     const stateRepo = this.dataSource.getRepository(TripItemState);

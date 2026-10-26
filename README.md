@@ -30,7 +30,9 @@ Permette di organizzare e spuntare tutti gli oggetti da portare in viaggio, gest
 
 ## 📋 Struttura del Catalogo e Modello Dati
 
-Il database parte vuoto ed è strutturato per organizzare sezioni (categorie) e oggetti (item) configurabili:
+L'intero database è **user-scoped**: ogni utente autenticato possiede il proprio catalogo isolato di sezioni (categorie con slug univoco per utente), oggetti (item), associazioni e viaggi (trips), garantendo totale privacy e indipendenza dei dati tra utenti.
+
+Il modello dati è strutturato per organizzare sezioni (categorie) e oggetti (item) configurabili:
 
 * **Sezioni / Categorie (`categories`)**:
   * Raggruppano gli oggetti per contesto o tipologia (es. Documenti, Abbigliamento, Cura personale, Accessori tech, ecc.).

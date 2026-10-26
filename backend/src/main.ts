@@ -3,8 +3,11 @@ import './load-env.js';
 import { NestFactory } from '@nestjs/core';
 import { RequestMethod } from '@nestjs/common';
 import { AppModule } from './app.module.js';
+import { ensureDatabaseSchema } from './database-migration.js';
 
 async function bootstrap() {
+  ensureDatabaseSchema();
+
   const app = await NestFactory.create(AppModule, {
     cors: {
       origin: (process.env.CORS_ALLOWED_ORIGINS ?? '')

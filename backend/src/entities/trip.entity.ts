@@ -1,5 +1,15 @@
-import { Column, CreateDateColumn, Entity, Index, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import type { TripItemState } from './trip-item-state.entity.js';
+import type { User } from './user.entity.js';
 
 @Entity({ name: 'trips' })
 @Index(['userId'])
@@ -28,6 +38,9 @@ export class Trip {
   @Column({ type: 'boolean', default: false })
   isArchived!: boolean;
 
+  @ManyToOne('User', { onDelete: 'CASCADE' })
+  user?: User;
+
   @OneToMany('TripItemState', 'trip', { cascade: true })
   itemStates!: TripItemState[];
 
@@ -37,4 +50,3 @@ export class Trip {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

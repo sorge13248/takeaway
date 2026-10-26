@@ -8,5 +8,10 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['**/*.spec.ts'],
+    env: {
+      NODE_ENV: 'test',
+      AUTH_MOCK_ENABLED: 'true',
+      DB_PATH: ':memory:',
+    },
   },
 });
